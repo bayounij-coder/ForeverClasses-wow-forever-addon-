@@ -12,7 +12,7 @@ A lightweight, high-performance personal resource and ability tracking HUD built
 
 ## Features
 
-### 1. Dynamic Resource HUD (Phase 1)
+### 1. Dynamic Resource HUD
 - **Health Bar:** Live health status with configurable numeric and percentage text overlays.
 - **Class-Colored Health Bar:** Optional setting to tint the health bar by your character's class color.
 - **Upcoming Heals (Heal Prediction):** Renders incoming direct and over-time heals seamlessly on the health bar.
@@ -22,13 +22,13 @@ A lightweight, high-performance personal resource and ability tracking HUD built
   - **Energy (Yellow)** for Rogues and Druid Cat form.
 - **Dynamic Class Crest Minimap Button:** Shows your animated high-resolution class crest orbiting the minimap rim.
 
-### 2. Combat Indicators & Debuffs (Phase 1.5)
+### 2. Combat Indicators & Debuffs
 - **Rogue / Feral Combo Points:** Crisp circular combo point orbs rendered smoothly beneath the HUD in combat.
 - **Harmful Debuffs Tray:** Docked to the right of the HUD, displaying up to 5 harmful combat debuffs with dispel-type colored borders and countdown timers.
 - **Debuff Exclusion System:** Filter out non-combat exhaustion or buffs (such as Campfire XP exhaustion) with `/fc ignore <name>`.
 - **Low Health Danger Warning:** Full-perimeter crimson border pulse and flashing red alert bar when player health drops to $\le 33\%$ HP (customizable threshold).
 
-### 3. Ability & Cooldown Management Bar (Phase 2)
+### 3. Ability & Cooldown Management Bar
 - **Docked Directly Above Health Bar:** 7-slot customizable tray cleanly centered over your health bar (30×30px icons, 4px gaps, 234px width perfectly framing the 240px health bar).
 - **Drag & Drop Customization:** Open your Spellbook (`P`) or bag and drag any spell or item directly onto slots 1–7.
 - **Rich Visual States:**
