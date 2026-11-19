@@ -1,0 +1,9 @@
+## Interface: 16001, 11505, 11506
+## Title: |cff00ccffForeverClasses|r |cffffaa00(Beta-Test)|r
+## Notes: Lightweight Personal Resource HUD (Health, Power, Upcoming Heals) for WoW Forever
+## Author: Miloud
+## Version: 1.0.3
+## SavedVariables: ForeverClassesDB
+
+Config.lua
+ForeverClasses.lua
