@@ -1338,22 +1338,10 @@ function FC:CreateHUD()
     powerBg:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
     powerBg:SetVertexColor(initR * 0.22, initG * 0.22, initB * 0.22, 0.85)
 
-    -- Five-Second Rule (FSR) Spark Indicator for Mana Users
-    local fsrSpark = powerBar:CreateTexture(nil, "OVERLAY", nil, 6)
-    fsrSpark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
-    fsrSpark:SetSize(16, db.powerHeight + 6)
-    fsrSpark:SetBlendMode("ADD")
-    fsrSpark:SetVertexColor(0.4, 0.8, 1.0, 0.85)
-    fsrSpark:Hide()
-    FC.FSRSpark = fsrSpark
-
-    -- Smooth Power Bar Animation & FSR Tracker Loop (WoW Forever Continuous Flow)
+    -- Smooth Power Bar Animation Loop (WoW Forever Continuous Flow)
     powerBar:SetScript("OnUpdate", function(self, elapsed)
         if FC.ProcessSmoothPower then
             FC:ProcessSmoothPower(elapsed)
-        end
-        if FC.ProcessFSRTracker then
-            FC:ProcessFSRTracker(elapsed)
         end
     end)
 
@@ -1772,7 +1760,6 @@ function FC:CreateHUD()
     FC.PowerBar = powerBar
     FC.PowerBg = powerBg
     FC.PowerText = powerText
-    FC.FSRSpark = fsrSpark
     FC.ComboFrame = comboFrame
     FC.TotemBar = totemBar
     FC.AbilityAnchor = abilityAnchor
@@ -6811,7 +6798,6 @@ function FC:UpdatePowerType()
     if FC.currentPowerType ~= powerType then
         FC.visualPower = nil
         FC.targetPower = nil
-        if FC.FSRSpark then FC.FSRSpark:Hide() end
     end
 
     FC.currentPowerType = powerType
@@ -6844,15 +6830,6 @@ function FC:UpdatePower()
             FC.targetPower = nil
         else
             local numCur = tonumber(currentPower) or 0
-
-            -- Detect mana expenditure to trigger Five-Second Rule (FSR)
-            if powerType == 0 and FC.lastRecordedMana and numCur < FC.lastRecordedMana then
-                FC.fsrEndTime = GetTime() + 5.0
-            end
-            if powerType == 0 then
-                FC.lastRecordedMana = numCur
-            end
-
             FC.targetPower = numCur
 
             -- First-time initialization or major jump: snap immediately
@@ -6896,35 +6873,6 @@ function FC:ProcessSmoothPower(elapsed)
     elseif visual ~= target then
         FC.visualPower = target
         pcall(FC.PowerBar.SetValue, FC.PowerBar, target)
-    end
-end
-
-function FC:ProcessFSRTracker(elapsed)
-    if not FC.FSRSpark or not FC.PowerBar then return end
-
-    -- Five-Second Rule only exists for Mana users (Casters / Healers)
-    if FC.currentPowerType ~= 0 then
-        if FC.FSRSpark:IsShown() then FC.FSRSpark:Hide() end
-        return
-    end
-
-    local now = GetTime()
-    if FC.fsrEndTime and FC.fsrEndTime > now then
-        local rem = FC.fsrEndTime - now
-        local progress = rem / 5.0 -- 1.0 down to 0.0
-        local barWidth = FC.PowerBar:GetWidth() or 240
-        if barWidth > 0 then
-            FC.FSRSpark:ClearAllPoints()
-            -- Spark slides smoothly from right to left over the 5-second window
-            FC.FSRSpark:SetPoint("CENTER", FC.PowerBar, "LEFT", barWidth * progress, 0)
-            if not FC.FSRSpark:IsShown() then
-                FC.FSRSpark:Show()
-            end
-        end
-    else
-        if FC.FSRSpark:IsShown() then
-            FC.FSRSpark:Hide()
-        end
     end
 end
 
@@ -8352,25 +8300,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
                 end
 
                 FC:TriggerGCD(castSpellName)
-
-                -- Five-Second Rule (FSR) trigger on spellcast for mana users
-                if FC.currentPowerType == 0 then
-                    local spellCostsMana = false
-                    if castSpellID and C_Spell and C_Spell.GetSpellPowerCost then
-                        local ok, costs = pcall(C_Spell.GetSpellPowerCost, castSpellID)
-                        if ok and costs then
-                            for _, costInfo in ipairs(costs) do
-                                if (costInfo.type == 0 or costInfo.name == "MANA") and costInfo.cost and costInfo.cost > 0 then
-                                    spellCostsMana = true
-                                    break
-                                end
-                            end
-                        end
-                    end
-                    if spellCostsMana then
-                        FC.fsrEndTime = GetTime() + 5.0
-                    end
-                end
 
                 if castSpellName then
                     local clean = string.lower((strtrim and strtrim(castSpellName)) or castSpellName)
