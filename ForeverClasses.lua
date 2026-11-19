@@ -5230,7 +5230,7 @@ function FC:GetPlayerBuffDuration(spellName, cleanName)
                 end
             end
             local st = (b.count and b.count > 0) and b.count or (DEFAULT_BUFF_STACKS and DEFAULT_BUFF_STACKS[cleanTarget])
-            return rem, b.duration, b.start, st
+            return rem, b.duration, b.start, st, b.instanceID
         else
             -- If native engine says buff is not present while out of combat, clear from activeBuffs
             if FC.activeBuffs and FC.activeBuffs[cleanTarget] then
@@ -5246,7 +5246,7 @@ function FC:GetPlayerBuffDuration(spellName, cleanName)
         if data and data.expires then
             local rem = data.expires - now
             if rem > 0.05 then
-                return rem, data.duration or 0, data.start, data.stacks
+                return rem, data.duration or 0, data.start, data.stacks, data.instanceID
             else
                 FC:Log("BUFF_EXPIRED", "clean=%s duration expired (dur=%.1f)", cleanTarget, tonumber(data.duration) or 0)
                 FC.activeBuffs[cleanTarget] = nil
@@ -6178,7 +6178,7 @@ function FC:UpdateCooldowns()
                 btn.itemID = (slotData.type == "item") and slotData.id or nil
 
                 -- 1. Check Active Buff (e.g. Bloodlust, Lightning Shield, Sprint, Evasion, Paladin Seals)
-                local buffRemaining, buffDuration, buffStart, buffStacks = FC:GetPlayerBuffDuration(slotData.name, cleanSlot)
+                local buffRemaining, buffDuration, buffStart, buffStacks, buffInstanceID = FC:GetPlayerBuffDuration(slotData.name, cleanSlot)
                 local isActiveBuff = (buffRemaining ~= nil and buffRemaining > 0)
 
                 -- 2. Query Cooldown
@@ -6393,10 +6393,36 @@ function FC:UpdateCooldowns()
 
                 -- Charges / Stacks (Only check when slot is not on cooldown or active buff or when refresh requested)
                 if isActiveBuff or not isOnCooldown or FC.needsCooldownRefresh then
-                    if isActiveBuff and buffStacks and (buffStacks > 1 or (buffStacks == 1 and DEFAULT_BUFF_STACKS and DEFAULT_BUFF_STACKS[cleanSlot])) then
+                    local displayedStack = false
+
+                    -- 1. Midnight 12.0 Secret-Safe Native Stack Display via C_UnitAuras.GetAuraApplicationDisplayCount
+                    local instID = buffInstanceID or (FC.buffToAuraInstance and FC.buffToAuraInstance[cleanSlot])
+                    if isActiveBuff and instID and C_UnitAuras and C_UnitAuras.GetAuraApplicationDisplayCount then
+                        local okDisp, dispCount = pcall(C_UnitAuras.GetAuraApplicationDisplayCount, instID)
+                        if okDisp and dispCount ~= nil then
+                            local isZeroOrEmpty = false
+                            if not IsSecret(dispCount) then
+                                if dispCount == "" or dispCount == 0 or dispCount == "0" then
+                                    isZeroOrEmpty = true
+                                end
+                            end
+                            if not isZeroOrEmpty then
+                                btn.countText:SetText(dispCount)
+                                btn.countText:Show()
+                                displayedStack = true
+                            end
+                        end
+                    end
+
+                    -- 2. Fallback to cached stacks if native display count was not used
+                    if not displayedStack and isActiveBuff and buffStacks and (not IsSecret(buffStacks)) and (buffStacks > 1 or (buffStacks == 1 and DEFAULT_BUFF_STACKS and DEFAULT_BUFF_STACKS[cleanSlot])) then
                         btn.countText:SetText(tostring(buffStacks))
                         btn.countText:Show()
-                    else
+                        displayedStack = true
+                    end
+
+                    -- 3. Spell Charges (e.g. Conflagrate, Charge) if no buff stacks displayed
+                    if not displayedStack then
                         local charges = FC:GetCharges(slotData)
                         if charges and not IsSecret(charges) and charges > 1 then
                             btn.countText:SetText(tostring(charges))
