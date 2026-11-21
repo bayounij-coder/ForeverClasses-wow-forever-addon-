@@ -1478,7 +1478,7 @@ function FC:CreateHUD()
 
     local function CreatePoisonSlot(parent, slotID, handLabel, alignPoint, xOffset)
         local slot = CreateFrame("Button", "ForeverClassesPoisonSlot" .. handLabel, parent, BackdropTemplateString)
-        slot:SetSize(56, 22)
+        slot:SetSize(60, 22)
         slot:SetPoint(alignPoint, parent, alignPoint, xOffset, 0)
         slot.slotID = slotID
         slot.handLabel = handLabel
@@ -1496,20 +1496,21 @@ function FC:CreateHUD()
         slot:SetBackdropBorderColor(0.0, 0.95, 0.60, 0.95)
 
         local glyph = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        glyph:SetPoint("LEFT", slot, "LEFT", 4, 0)
+        glyph:SetPoint("LEFT", slot, "LEFT", 3, 0)
         glyph:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
         glyph:SetText(handLabel)
         glyph:SetTextColor(0.70, 0.75, 0.85, 0.9)
         slot.glyph = glyph
 
         local icon = slot:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(16, 16)
-        icon:SetPoint("LEFT", glyph, "RIGHT", 3, 0)
+        icon:SetSize(15, 15)
+        icon:SetPoint("LEFT", glyph, "RIGHT", 2, 0)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         slot.icon = icon
 
         local chargesText = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        chargesText:SetPoint("LEFT", icon, "RIGHT", 4, 0)
+        chargesText:SetPoint("RIGHT", slot, "RIGHT", -3, 0)
+        chargesText:SetJustifyH("RIGHT")
         chargesText:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
         chargesText:SetText("")
         chargesText:SetTextColor(0.0, 0.95, 0.60, 1.0)
@@ -1599,8 +1600,8 @@ function FC:CreateHUD()
         return slot
     end
 
-    local poisonMH = CreatePoisonSlot(poisonBar, 16, "MH", "LEFT", 2)
-    local poisonOH = CreatePoisonSlot(poisonBar, 17, "OH", "RIGHT", -2)
+    local poisonMH = CreatePoisonSlot(poisonBar, 16, "MH", "LEFT", 1)
+    local poisonOH = CreatePoisonSlot(poisonBar, 17, "OH", "RIGHT", -1)
     poisonBar.MH = poisonMH
     poisonBar.OH = poisonOH
     FC.PoisonBar = poisonBar

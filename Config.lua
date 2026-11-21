@@ -742,49 +742,51 @@ function FC:CreateConfigWindow()
 
     -- Rogue Poison Badges Preview (Flanking Combo Points in Concept 1)
     local previewPoisonMH = CreateFrame("Frame", nil, previewSubBar, BackdropTemplateString)
-    previewPoisonMH:SetSize(56, 22)
-    previewPoisonMH:SetPoint("LEFT", previewSubBar, "LEFT", 2, 0)
+    previewPoisonMH:SetSize(60, 22)
+    previewPoisonMH:SetPoint("LEFT", previewSubBar, "LEFT", 1, 0)
     ApplyWHITE8X8Backdrop(previewPoisonMH, 0.08, 0.10, 0.14, 0.95, 0.0, 0.95, 0.6, 0.9, 1)
 
     local pGlyphMH = previewPoisonMH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pGlyphMH:SetPoint("LEFT", previewPoisonMH, "LEFT", 4, 0)
+    pGlyphMH:SetPoint("LEFT", previewPoisonMH, "LEFT", 3, 0)
     pGlyphMH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
     pGlyphMH:SetText("MH")
     pGlyphMH:SetTextColor(0.70, 0.75, 0.85, 0.9)
 
     local pIconMH = previewPoisonMH:CreateTexture(nil, "ARTWORK")
-    pIconMH:SetSize(16, 16)
-    pIconMH:SetPoint("LEFT", pGlyphMH, "RIGHT", 3, 0)
+    pIconMH:SetSize(15, 15)
+    pIconMH:SetPoint("LEFT", pGlyphMH, "RIGHT", 2, 0)
     pIconMH:SetTexture("Interface\\Icons\\Ability_Poisons")
     pIconMH:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     local pChargesMH = previewPoisonMH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pChargesMH:SetPoint("LEFT", pIconMH, "RIGHT", 4, 0)
+    pChargesMH:SetPoint("RIGHT", previewPoisonMH, "RIGHT", -3, 0)
+    pChargesMH:SetJustifyH("RIGHT")
     pChargesMH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    pChargesMH:SetText("75")
+    pChargesMH:SetText("150")
     pChargesMH:SetTextColor(0.0, 0.95, 0.60, 1.0)
 
     local previewPoisonOH = CreateFrame("Frame", nil, previewSubBar, BackdropTemplateString)
-    previewPoisonOH:SetSize(56, 22)
-    previewPoisonOH:SetPoint("RIGHT", previewSubBar, "RIGHT", -2, 0)
+    previewPoisonOH:SetSize(60, 22)
+    previewPoisonOH:SetPoint("RIGHT", previewSubBar, "RIGHT", -1, 0)
     ApplyWHITE8X8Backdrop(previewPoisonOH, 0.08, 0.10, 0.14, 0.95, 0.0, 0.95, 0.6, 0.9, 1)
 
     local pGlyphOH = previewPoisonOH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pGlyphOH:SetPoint("LEFT", previewPoisonOH, "LEFT", 4, 0)
+    pGlyphOH:SetPoint("LEFT", previewPoisonOH, "LEFT", 3, 0)
     pGlyphOH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
     pGlyphOH:SetText("OH")
     pGlyphOH:SetTextColor(0.70, 0.75, 0.85, 0.9)
 
     local pIconOH = previewPoisonOH:CreateTexture(nil, "ARTWORK")
-    pIconOH:SetSize(16, 16)
-    pIconOH:SetPoint("LEFT", pGlyphOH, "RIGHT", 3, 0)
+    pIconOH:SetSize(15, 15)
+    pIconOH:SetPoint("LEFT", pGlyphOH, "RIGHT", 2, 0)
     pIconOH:SetTexture("Interface\\Icons\\Ability_Rogue_DualWeild")
     pIconOH:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     local pChargesOH = previewPoisonOH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    pChargesOH:SetPoint("LEFT", pIconOH, "RIGHT", 4, 0)
+    pChargesOH:SetPoint("RIGHT", previewPoisonOH, "RIGHT", -3, 0)
+    pChargesOH:SetJustifyH("RIGHT")
     pChargesOH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
-    pChargesOH:SetText("92")
+    pChargesOH:SetText("135")
     pChargesOH:SetTextColor(0.0, 0.95, 0.60, 1.0)
 
     -- Preview Update Engine
@@ -1660,7 +1662,7 @@ function FC:CreateConfigWindow()
         swCP:UpdateValue()
 
         if playerClass == "ROGUE" then
-            local cardPoison = CreateCard(panelClass, 160, -146)
+            local cardPoison = CreateCard(panelClass, 196, -146)
             cardPoison:SetBackdropBorderColor(0.0, 0.95, 0.6, 0.6)
 
             local pHeader = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -1690,8 +1692,8 @@ function FC:CreateConfigWindow()
             swPoison.thumb = thumbPoison
 
             local pTitle = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            pTitle:SetPoint("TOPLEFT", pDivider, "BOTTOMLEFT", 0, -10)
-            pTitle:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -60, -37)
+            pTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -36)
+            pTitle:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -60, -36)
             pTitle:SetJustifyH("LEFT")
             pTitle:SetText("Poison Tracking Dock")
 
@@ -1732,7 +1734,7 @@ function FC:CreateConfigWindow()
             -- 2. Low Charges Audio Alert Toggle
             local swSound = CreateFrame("Button", nil, cardPoison, BackdropTemplateString)
             swSound:SetSize(38, 20)
-            swSound:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -84)
+            swSound:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -90)
             ApplyWHITE8X8Backdrop(swSound, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
 
             local thumbSound = swSound:CreateTexture(nil, "OVERLAY")
@@ -1741,11 +1743,16 @@ function FC:CreateConfigWindow()
             swSound.thumb = thumbSound
 
             local sTitle = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            sTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -84)
+            sTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -92)
+            sTitle:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -60, -92)
+            sTitle:SetJustifyH("LEFT")
             sTitle:SetText("Low Charges Audio Alert")
 
             local sDesc = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-            sDesc:SetPoint("TOPLEFT", sTitle, "BOTTOMLEFT", 0, -2)
+            sDesc:SetPoint("TOPLEFT", sTitle, "BOTTOMLEFT", 0, -3)
+            sDesc:SetPoint("TOPRIGHT", sTitle, "BOTTOMRIGHT", 0, -3)
+            sDesc:SetWordWrap(true)
+            sDesc:SetJustifyH("LEFT")
             sDesc:SetText("Plays a subtle warning chime when weapon poison drops to <= 15 charges.")
 
             swSound.UpdateValue = function(self)
@@ -1776,7 +1783,7 @@ function FC:CreateConfigWindow()
             -- 3. Missing Poison Reminders Toggle
             local swRemind = CreateFrame("Button", nil, cardPoison, BackdropTemplateString)
             swRemind:SetSize(38, 20)
-            swRemind:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -122)
+            swRemind:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -138)
             ApplyWHITE8X8Backdrop(swRemind, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
 
             local thumbRemind = swRemind:CreateTexture(nil, "OVERLAY")
@@ -1785,11 +1792,16 @@ function FC:CreateConfigWindow()
             swRemind.thumb = thumbRemind
 
             local rTitle = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            rTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -122)
+            rTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -140)
+            rTitle:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -60, -140)
+            rTitle:SetJustifyH("LEFT")
             rTitle:SetText("Missing Poison Reminders")
 
             local rDesc = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-            rDesc:SetPoint("TOPLEFT", rTitle, "BOTTOMLEFT", 0, -2)
+            rDesc:SetPoint("TOPLEFT", rTitle, "BOTTOMLEFT", 0, -3)
+            rDesc:SetPoint("TOPRIGHT", rTitle, "BOTTOMRIGHT", 0, -3)
+            rDesc:SetWordWrap(true)
+            rDesc:SetJustifyH("LEFT")
             rDesc:SetText("Notifies you in chat on Ready Check or combat exit if a weapon is uncoated.")
 
             swRemind.UpdateValue = function(self)
