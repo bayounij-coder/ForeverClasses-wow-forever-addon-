@@ -65,6 +65,11 @@ FC.Defaults = {
     autoFadeAlpha = 0.35,      -- Resting alpha when faded out (default 35%)
     showTotems = true,         -- Show Shaman Totem Bar below panel when totems are active
     showAbsorbs = true,        -- Show damage absorption shields on health bar
+    showPoisonTracker = true,  -- Show Rogue poison tracking dock below power bar
+    poisonAlertThreshold = 15, -- Low poison charges threshold for amber alert
+    poisonSoundAlert = true,   -- Sound alert on low poison charges
+    poisonAutoHide = false,    -- Auto-hide poison badges when both weapons healthy
+    poisonReminders = true,    -- Missing poison chat reminder on ready check / world enter
 }
 
 -- ============================================================================
@@ -216,6 +221,11 @@ FC.PER_CHAR_SETTINGS = {
     "autoFade",
     "autoFadeAlpha",
     "textMode",
+    "showPoisonTracker",
+    "poisonAlertThreshold",
+    "poisonSoundAlert",
+    "poisonAutoHide",
+    "poisonReminders",
 }
 
 function FC:SaveCharSetting(key, val)
@@ -730,6 +740,53 @@ function FC:CreateConfigWindow()
         previewCPPips[i] = pip
     end
 
+    -- Rogue Poison Badges Preview (Flanking Combo Points in Concept 1)
+    local previewPoisonMH = CreateFrame("Frame", nil, previewSubBar, BackdropTemplateString)
+    previewPoisonMH:SetSize(56, 22)
+    previewPoisonMH:SetPoint("LEFT", previewSubBar, "LEFT", 2, 0)
+    ApplyWHITE8X8Backdrop(previewPoisonMH, 0.08, 0.10, 0.14, 0.95, 0.0, 0.95, 0.6, 0.9, 1)
+
+    local pGlyphMH = previewPoisonMH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    pGlyphMH:SetPoint("LEFT", previewPoisonMH, "LEFT", 4, 0)
+    pGlyphMH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    pGlyphMH:SetText("MH")
+    pGlyphMH:SetTextColor(0.70, 0.75, 0.85, 0.9)
+
+    local pIconMH = previewPoisonMH:CreateTexture(nil, "ARTWORK")
+    pIconMH:SetSize(16, 16)
+    pIconMH:SetPoint("LEFT", pGlyphMH, "RIGHT", 3, 0)
+    pIconMH:SetTexture("Interface\\Icons\\Ability_Poisons")
+    pIconMH:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local pChargesMH = previewPoisonMH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    pChargesMH:SetPoint("LEFT", pIconMH, "RIGHT", 4, 0)
+    pChargesMH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    pChargesMH:SetText("75")
+    pChargesMH:SetTextColor(0.0, 0.95, 0.60, 1.0)
+
+    local previewPoisonOH = CreateFrame("Frame", nil, previewSubBar, BackdropTemplateString)
+    previewPoisonOH:SetSize(56, 22)
+    previewPoisonOH:SetPoint("RIGHT", previewSubBar, "RIGHT", -2, 0)
+    ApplyWHITE8X8Backdrop(previewPoisonOH, 0.08, 0.10, 0.14, 0.95, 0.0, 0.95, 0.6, 0.9, 1)
+
+    local pGlyphOH = previewPoisonOH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    pGlyphOH:SetPoint("LEFT", previewPoisonOH, "LEFT", 4, 0)
+    pGlyphOH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+    pGlyphOH:SetText("OH")
+    pGlyphOH:SetTextColor(0.70, 0.75, 0.85, 0.9)
+
+    local pIconOH = previewPoisonOH:CreateTexture(nil, "ARTWORK")
+    pIconOH:SetSize(16, 16)
+    pIconOH:SetPoint("LEFT", pGlyphOH, "RIGHT", 3, 0)
+    pIconOH:SetTexture("Interface\\Icons\\Ability_Rogue_DualWeild")
+    pIconOH:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local pChargesOH = previewPoisonOH:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    pChargesOH:SetPoint("LEFT", pIconOH, "RIGHT", 4, 0)
+    pChargesOH:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    pChargesOH:SetText("92")
+    pChargesOH:SetTextColor(0.0, 0.95, 0.60, 1.0)
+
     -- Preview Update Engine
     local function UpdateHUDPreview()
         local isClassColor = ForeverClassesDB.classColorHealth and true or false
@@ -747,12 +804,13 @@ function FC:CreateConfigWindow()
         local topHeight = hasSlots and 27 or 0
         local hasSubBar = false
         local subBarH = 0
+        local showPoisons = (ForeverClassesDB.showPoisonTracker ~= false)
         if playerClass == "SHAMAN" and showTotems then
             hasSubBar = true
             subBarH = 26 -- 4px gap + 22px totem buttons
-        elseif (playerClass == "ROGUE" or playerClass == "DRUID") and showCP then
+        elseif (playerClass == "ROGUE" or playerClass == "DRUID") and (showCP or (playerClass == "ROGUE" and showPoisons)) then
             hasSubBar = true
-            subBarH = 22 -- 4px gap + 18px combo pips
+            subBarH = 22 -- 4px gap + 18px combo pips / poison badges
         end
 
         local bottomHeight = 35 + (hasSubBar and subBarH or 0) -- 22 health + 1 gap + 12 power + subBar
@@ -872,15 +930,32 @@ function FC:CreateConfigWindow()
         end
 
         -- 6. Class Sub-Bars
+        local showPoisons = (ForeverClassesDB.showPoisonTracker ~= false)
         if playerClass == "SHAMAN" and showTotems then
             previewTotemBar:Show()
             previewCPBar:Hide()
-        elseif (playerClass == "ROGUE" or playerClass == "DRUID") and showCP then
+            if previewPoisonMH then previewPoisonMH:Hide() end
+            if previewPoisonOH then previewPoisonOH:Hide() end
+        elseif playerClass == "ROGUE" then
+            if showCP then previewCPBar:Show() else previewCPBar:Hide() end
+            if showPoisons then
+                if previewPoisonMH then previewPoisonMH:Show() end
+                if previewPoisonOH then previewPoisonOH:Show() end
+            else
+                if previewPoisonMH then previewPoisonMH:Hide() end
+                if previewPoisonOH then previewPoisonOH:Hide() end
+            end
+            previewTotemBar:Hide()
+        elseif playerClass == "DRUID" and showCP then
             previewCPBar:Show()
             previewTotemBar:Hide()
+            if previewPoisonMH then previewPoisonMH:Hide() end
+            if previewPoisonOH then previewPoisonOH:Hide() end
         else
             previewTotemBar:Hide()
             previewCPBar:Hide()
+            if previewPoisonMH then previewPoisonMH:Hide() end
+            if previewPoisonOH then previewPoisonOH:Hide() end
         end
     end
 
@@ -1583,6 +1658,172 @@ function FC:CreateConfigWindow()
         end)
         cardClassEngine.sw = swCP
         swCP:UpdateValue()
+
+        if playerClass == "ROGUE" then
+            local cardPoison = CreateCard(panelClass, 160, -146)
+            cardPoison:SetBackdropBorderColor(0.0, 0.95, 0.6, 0.6)
+
+            local pHeader = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            pHeader:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -10)
+            pHeader:SetText("|cff00ff96ROGUE POISON TRACKING DOCK|r")
+
+            local pBadge = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            pBadge:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -10)
+            pBadge:SetText("|cff00ff961-Click Quick-Apply|r")
+
+            local pDivider = cardPoison:CreateTexture(nil, "ARTWORK")
+            pDivider:SetHeight(1)
+            pDivider:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -26)
+            pDivider:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -26)
+            pDivider:SetTexture("Interface\\Buttons\\WHITE8X8")
+            pDivider:SetVertexColor(0.2, 0.24, 0.32, 0.8)
+
+            -- 1. Enable Poison Tracking Toggle
+            local swPoison = CreateFrame("Button", nil, cardPoison, BackdropTemplateString)
+            swPoison:SetSize(38, 20)
+            swPoison:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -34)
+            ApplyWHITE8X8Backdrop(swPoison, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
+
+            local thumbPoison = swPoison:CreateTexture(nil, "OVERLAY")
+            thumbPoison:SetSize(14, 14)
+            thumbPoison:SetTexture("Interface\\Buttons\\WHITE8X8")
+            swPoison.thumb = thumbPoison
+
+            local pTitle = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            pTitle:SetPoint("TOPLEFT", pDivider, "BOTTOMLEFT", 0, -10)
+            pTitle:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -60, -37)
+            pTitle:SetJustifyH("LEFT")
+            pTitle:SetText("Poison Tracking Dock")
+
+            local pDesc = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            pDesc:SetPoint("TOPLEFT", pTitle, "BOTTOMLEFT", 0, -3)
+            pDesc:SetPoint("TOPRIGHT", pTitle, "BOTTOMRIGHT", 0, -3)
+            pDesc:SetWordWrap(true)
+            pDesc:SetJustifyH("LEFT")
+            pDesc:SetText("Docks Main-Hand and Off-Hand poison badges flanking combo points. Right-click any slot out of combat to open the 1-click Quick-Apply flyout.")
+
+            swPoison.UpdateValue = function(self)
+                local val = (ForeverClassesDB.showPoisonTracker ~= false)
+                if val then
+                    self:SetBackdropColor(0.0, 0.75, 0.50, 1.0)
+                    self:SetBackdropBorderColor(0.0, 0.95, 0.60, 1.0)
+                    thumbPoison:ClearAllPoints()
+                    thumbPoison:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+                    thumbPoison:SetVertexColor(1, 1, 1, 1)
+                else
+                    self:SetBackdropColor(0.16, 0.18, 0.24, 1.0)
+                    self:SetBackdropBorderColor(0.26, 0.30, 0.38, 1.0)
+                    thumbPoison:ClearAllPoints()
+                    thumbPoison:SetPoint("LEFT", self, "LEFT", 3, 0)
+                    thumbPoison:SetVertexColor(0.65, 0.68, 0.75, 1)
+                end
+            end
+
+            swPoison:SetScript("OnClick", function(self)
+                local newVal = not (ForeverClassesDB.showPoisonTracker ~= false)
+                PlaySound(newVal and (SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856) or (SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857))
+                ForeverClassesDB.showPoisonTracker = newVal
+                if FC.SaveCharSetting then FC:SaveCharSetting("showPoisonTracker", newVal) end
+                if FC.UpdatePoisonTracker then FC:UpdatePoisonTracker() end
+                self:UpdateValue()
+                UpdateHUDPreview()
+            end)
+
+            -- 2. Low Charges Audio Alert Toggle
+            local swSound = CreateFrame("Button", nil, cardPoison, BackdropTemplateString)
+            swSound:SetSize(38, 20)
+            swSound:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -84)
+            ApplyWHITE8X8Backdrop(swSound, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
+
+            local thumbSound = swSound:CreateTexture(nil, "OVERLAY")
+            thumbSound:SetSize(14, 14)
+            thumbSound:SetTexture("Interface\\Buttons\\WHITE8X8")
+            swSound.thumb = thumbSound
+
+            local sTitle = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            sTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -84)
+            sTitle:SetText("Low Charges Audio Alert")
+
+            local sDesc = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            sDesc:SetPoint("TOPLEFT", sTitle, "BOTTOMLEFT", 0, -2)
+            sDesc:SetText("Plays a subtle warning chime when weapon poison drops to <= 15 charges.")
+
+            swSound.UpdateValue = function(self)
+                local val = (ForeverClassesDB.poisonSoundAlert ~= false)
+                if val then
+                    self:SetBackdropColor(0.0, 0.75, 0.50, 1.0)
+                    self:SetBackdropBorderColor(0.0, 0.95, 0.60, 1.0)
+                    thumbSound:ClearAllPoints()
+                    thumbSound:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+                    thumbSound:SetVertexColor(1, 1, 1, 1)
+                else
+                    self:SetBackdropColor(0.16, 0.18, 0.24, 1.0)
+                    self:SetBackdropBorderColor(0.26, 0.30, 0.38, 1.0)
+                    thumbSound:ClearAllPoints()
+                    thumbSound:SetPoint("LEFT", self, "LEFT", 3, 0)
+                    thumbSound:SetVertexColor(0.65, 0.68, 0.75, 1)
+                end
+            end
+
+            swSound:SetScript("OnClick", function(self)
+                local newVal = not (ForeverClassesDB.poisonSoundAlert ~= false)
+                PlaySound(newVal and (SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856) or (SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857))
+                ForeverClassesDB.poisonSoundAlert = newVal
+                if FC.SaveCharSetting then FC:SaveCharSetting("poisonSoundAlert", newVal) end
+                self:UpdateValue()
+            end)
+
+            -- 3. Missing Poison Reminders Toggle
+            local swRemind = CreateFrame("Button", nil, cardPoison, BackdropTemplateString)
+            swRemind:SetSize(38, 20)
+            swRemind:SetPoint("TOPRIGHT", cardPoison, "TOPRIGHT", -12, -122)
+            ApplyWHITE8X8Backdrop(swRemind, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
+
+            local thumbRemind = swRemind:CreateTexture(nil, "OVERLAY")
+            thumbRemind:SetSize(14, 14)
+            thumbRemind:SetTexture("Interface\\Buttons\\WHITE8X8")
+            swRemind.thumb = thumbRemind
+
+            local rTitle = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            rTitle:SetPoint("TOPLEFT", cardPoison, "TOPLEFT", 12, -122)
+            rTitle:SetText("Missing Poison Reminders")
+
+            local rDesc = cardPoison:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            rDesc:SetPoint("TOPLEFT", rTitle, "BOTTOMLEFT", 0, -2)
+            rDesc:SetText("Notifies you in chat on Ready Check or combat exit if a weapon is uncoated.")
+
+            swRemind.UpdateValue = function(self)
+                local val = (ForeverClassesDB.poisonReminders ~= false)
+                if val then
+                    self:SetBackdropColor(0.0, 0.75, 0.50, 1.0)
+                    self:SetBackdropBorderColor(0.0, 0.95, 0.60, 1.0)
+                    thumbRemind:ClearAllPoints()
+                    thumbRemind:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+                    thumbRemind:SetVertexColor(1, 1, 1, 1)
+                else
+                    self:SetBackdropColor(0.16, 0.18, 0.24, 1.0)
+                    self:SetBackdropBorderColor(0.26, 0.30, 0.38, 1.0)
+                    thumbRemind:ClearAllPoints()
+                    thumbRemind:SetPoint("LEFT", self, "LEFT", 3, 0)
+                    thumbRemind:SetVertexColor(0.65, 0.68, 0.75, 1)
+                end
+            end
+
+            swRemind:SetScript("OnClick", function(self)
+                local newVal = not (ForeverClassesDB.poisonReminders ~= false)
+                PlaySound(newVal and (SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856) or (SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857))
+                ForeverClassesDB.poisonReminders = newVal
+                if FC.SaveCharSetting then FC:SaveCharSetting("poisonReminders", newVal) end
+                self:UpdateValue()
+            end)
+
+            swPoison:UpdateValue()
+            swSound:UpdateValue()
+            swRemind:UpdateValue()
+            cardClassEngine.swPoison = swPoison
+            cardClassEngine.swSound = swSound
+            cardClassEngine.swRemind = swRemind
+        end
     else
         -- Unsupported Class Message Card
         cardClassEngine = CreateCard(panelClass, 120, -40)
@@ -1926,6 +2167,9 @@ function FC:CreateConfigWindow()
         if cardPulse and cardPulse.sw then cardPulse.sw:UpdateValue() end
 
         if cardClassEngine and cardClassEngine.sw then cardClassEngine.sw:UpdateValue() end
+        if cardClassEngine and cardClassEngine.swPoison then cardClassEngine.swPoison:UpdateValue() end
+        if cardClassEngine and cardClassEngine.swSound then cardClassEngine.swSound:UpdateValue() end
+        if cardClassEngine and cardClassEngine.swRemind then cardClassEngine.swRemind:UpdateValue() end
 
         if cardLowHp then cardLowHp:UpdateValue() end
         if cardDebuffs and cardDebuffs.sw then cardDebuffs.sw:UpdateValue() end

@@ -1468,6 +1468,157 @@ function FC:CreateHUD()
     comboFrame.pips = pips
 
     -- ========================================================================
+    -- Rogue Poison Tracking Dock (Sub-Bar Flanking Combo Points)
+    -- ========================================================================
+    local poisonBar = CreateFrame("Frame", "ForeverClassesPoisonBar", frame)
+    poisonBar:SetSize(db.barWidth, 24)
+    poisonBar:SetPoint("TOPLEFT", powerBar, "BOTTOMLEFT", 0, -4)
+    poisonBar:SetFrameLevel(frame:GetFrameLevel() + 5)
+    poisonBar:Hide()
+
+    local function CreatePoisonSlot(parent, slotID, handLabel, alignPoint, xOffset)
+        local slot = CreateFrame("Button", "ForeverClassesPoisonSlot" .. handLabel, parent, BackdropTemplateString)
+        slot:SetSize(56, 22)
+        slot:SetPoint(alignPoint, parent, alignPoint, xOffset, 0)
+        slot.slotID = slotID
+        slot.handLabel = handLabel
+        slot.state = "MISSING"
+
+        slot:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            tile = false,
+            tileSize = 0,
+            edgeSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 }
+        })
+        slot:SetBackdropColor(0.08, 0.10, 0.14, 0.95)
+        slot:SetBackdropBorderColor(0.0, 0.95, 0.60, 0.95)
+
+        local glyph = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        glyph:SetPoint("LEFT", slot, "LEFT", 4, 0)
+        glyph:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+        glyph:SetText(handLabel)
+        glyph:SetTextColor(0.70, 0.75, 0.85, 0.9)
+        slot.glyph = glyph
+
+        local icon = slot:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(16, 16)
+        icon:SetPoint("LEFT", glyph, "RIGHT", 3, 0)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        slot.icon = icon
+
+        local chargesText = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        chargesText:SetPoint("LEFT", icon, "RIGHT", 4, 0)
+        chargesText:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+        chargesText:SetText("")
+        chargesText:SetTextColor(0.0, 0.95, 0.60, 1.0)
+        chargesText:SetShadowColor(0, 0, 0, 0.9)
+        chargesText:SetShadowOffset(1, -1)
+        slot.chargesText = chargesText
+
+        local plusIcon = slot:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        plusIcon:SetPoint("CENTER", icon, "CENTER", 0, 1)
+        plusIcon:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+        plusIcon:SetText("+")
+        plusIcon:SetTextColor(1.0, 0.25, 0.25, 1.0)
+        plusIcon:Hide()
+        slot.plusIcon = plusIcon
+
+        local glow = slot:CreateTexture(nil, "OVERLAY")
+        glow:SetAllPoints(slot)
+        glow:SetColorTexture(1.0, 0.70, 0.10, 0.25)
+        glow:Hide()
+        slot.glow = glow
+
+        local durationBar = CreateFrame("StatusBar", nil, slot)
+        durationBar:SetPoint("BOTTOMLEFT", slot, "BOTTOMLEFT", 1, 1)
+        durationBar:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+        durationBar:SetHeight(2)
+        durationBar:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
+        durationBar:SetMinMaxValues(0, 1800)
+        durationBar:SetValue(0)
+        durationBar:Hide()
+        slot.durationBar = durationBar
+
+        slot:RegisterForClicks("RightButtonUp", "LeftButtonUp")
+        slot:RegisterForDrag("LeftButton")
+        slot:SetScript("OnDragStart", function()
+            if frame.StartMoving and (not ForeverClassesDB.movementMode or ForeverClassesDB.movementMode == "FREE" or IsAltKeyDown()) then
+                frame:StartMoving()
+                frame.isMoving = true
+            end
+        end)
+        slot:SetScript("OnDragStop", function()
+            if frame.StopMovingOrSizing and frame.isMoving then
+                frame:StopMovingOrSizing()
+                frame.isMoving = false
+                if FC.SavePosition then FC:SavePosition() end
+            end
+        end)
+
+        slot:SetScript("OnClick", function(self, button)
+            if button == "RightButton" then
+                if InCombatLockdown and InCombatLockdown() then
+                    DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff[ForeverClasses]|r |cffff2020Cannot change poisons while in combat!|r")
+                    return
+                end
+                if FC.TogglePoisonFlyout then
+                    FC:TogglePoisonFlyout(self, self.slotID)
+                end
+            end
+        end)
+
+        slot:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:ClearLines()
+            local hand = (self.slotID == 16) and "Main Hand" or "Off Hand"
+            GameTooltip:AddLine("|cff00ccffForeverClasses|r - " .. hand .. " Poison", 1, 1, 1)
+            if self.poisonName then
+                GameTooltip:AddLine("Active: |cffffffff" .. self.poisonName .. "|r", 0, 1, 0.6)
+                if self.currentCharges and self.currentCharges > 0 then
+                    GameTooltip:AddLine("Charges remaining: |cffffd100" .. self.currentCharges .. "|r")
+                end
+                if self.currentExp then
+                    local mins = math.floor(self.currentExp / 60)
+                    local secs = self.currentExp % 60
+                    GameTooltip:AddLine(string.format("Time remaining: |cffffd100%d min %02d sec|r", mins, secs))
+                end
+            else
+                GameTooltip:AddLine("|cffff3333No active poison applied|r")
+            end
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("|cff00e5ffRight-Click:|r Open Poison Quick-Apply", 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+
+        slot:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        return slot
+    end
+
+    local poisonMH = CreatePoisonSlot(poisonBar, 16, "MH", "LEFT", 2)
+    local poisonOH = CreatePoisonSlot(poisonBar, 17, "OH", "RIGHT", -2)
+    poisonBar.MH = poisonMH
+    poisonBar.OH = poisonOH
+    FC.PoisonBar = poisonBar
+    FC.PoisonMH = poisonMH
+    FC.PoisonOH = poisonOH
+
+    local poisonThrottle = 0
+    poisonBar:SetScript("OnUpdate", function(self, elapsed)
+        poisonThrottle = poisonThrottle + elapsed
+        if poisonThrottle >= 1.0 then
+            poisonThrottle = 0
+            if FC.UpdatePoisonTracker then
+                FC:UpdatePoisonTracker()
+            end
+        end
+    end)
+
+    -- ========================================================================
     -- Totem Bar (Shaman Only - Docked beneath Power Bar)
     -- ========================================================================
     local totemBar = CreateFrame("Frame", "ForeverClassesTotemBar", frame)
@@ -1762,6 +1913,7 @@ function FC:CreateHUD()
     FC.PowerText = powerText
     FC.ComboFrame = comboFrame
     FC.TotemBar = totemBar
+    FC.PoisonBar = poisonBar
     FC.AbilityAnchor = abilityAnchor
     FC.LowHealthFrame = lowHealthFrame
     FC.DebuffTray = debuffTray
@@ -7039,8 +7191,655 @@ function FC:UpdateComboPoints()
 end
 
 -- ============================================================================
--- Shaman Totem Bar Controller
+-- Rogue Poison Tracking Engine (Passive Weapon Enchant & Charges HUD)
 -- ============================================================================
+
+local KNOWN_POISON_IDS = {
+    -- Instant Poison (Ranks 1 to 7)
+    [6947] = true, [6949] = true, [6950] = true, [8926] = true, [8927] = true, [8928] = true, [21927] = true,
+    -- Deadly Poison (Ranks 1 to 5)
+    [2892] = true, [2893] = true, [8984] = true, [8985] = true, [20844] = true,
+    -- Crippling Poison (Ranks 1 & 2)
+    [3775] = true, [3776] = true,
+    -- Mind-numbing Poison (Ranks 1 to 3)
+    [5237] = true, [6951] = true, [9186] = true,
+    -- Wound Poison (Ranks 1 to 5)
+    [10918] = true, [10920] = true, [10921] = true, [10922] = true, [22055] = true,
+    -- Anesthetic Poison (Ranks 1 & 2)
+    [21835] = true, [43231] = true,
+}
+FC.KNOWN_POISON_IDS = KNOWN_POISON_IDS
+
+FC.poisonCache = {}
+FC.poisonEnchantCache = {}
+
+local POISON_REJECT_PATTERNS = {
+    "anti%-venom", "antidote", "potion", "elixir", "flask", "water", "bread",
+    "meat", "roast", "stew", "food", "drink", "scroll", "bandage", "stone", "oil"
+}
+
+local poisonScanTooltip = CreateFrame("GameTooltip", "ForeverClassesPoisonScanTooltip", nil, "GameTooltipTemplate")
+poisonScanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+local function SafeGetItemInfo(item)
+    if not item then return nil end
+    local fn = (C_Item and C_Item.GetItemInfo) or _G.GetItemInfo
+    if not fn then return nil end
+    local ok, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17 = pcall(fn, item)
+    if ok then
+        return a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16, a17
+    end
+    return nil
+end
+
+function FC:IsPoisonItem(itemID, itemLink)
+    if not itemID then return false end
+
+    if KNOWN_POISON_IDS[itemID] then
+        local name, _, quality, _, _, _, _, _, _, texture = SafeGetItemInfo(itemID)
+        return true, name, texture, quality
+    end
+
+    if FC.poisonCache[itemID] ~= nil then
+        if FC.poisonCache[itemID] == false then
+            return false
+        else
+            local name, _, quality, _, _, _, _, _, _, texture = SafeGetItemInfo(itemID)
+            return true, name, texture, quality
+        end
+    end
+
+    local itemName, _, itemQuality, _, _, _, itemSubType, _, _, itemTexture = SafeGetItemInfo(itemLink or itemID)
+
+    if itemName then
+        local lowerName = string.lower(itemName)
+        for _, pat in ipairs(POISON_REJECT_PATTERNS) do
+            if string.find(lowerName, pat) then
+                FC.poisonCache[itemID] = false
+                return false
+            end
+        end
+    end
+
+    if itemSubType and itemSubType ~= "Poison" and itemSubType ~= "Consumable" and itemSubType ~= "Other" then
+        FC.poisonCache[itemID] = false
+        return false
+    end
+
+    local isPoison = false
+    if C_TooltipInfo and C_TooltipInfo.GetItemByID then
+        local data = C_TooltipInfo.GetItemByID(itemID)
+        if data and data.lines then
+            for _, line in ipairs(data.lines) do
+                local text = line.leftText
+                if text then
+                    local lower = string.lower(text)
+                    if string.find(lower, "coats your weapon") or string.find(lower, "coats a weapon") or
+                       string.find(lower, "coat your weapon") or string.find(lower, "apply a poison to your weapon") then
+                        isPoison = true
+                        break
+                    end
+                end
+            end
+        end
+    else
+        poisonScanTooltip:ClearLines()
+        if itemLink then
+            poisonScanTooltip:SetHyperlink(itemLink)
+        else
+            poisonScanTooltip:SetItemByID(itemID)
+        end
+        for i = 1, poisonScanTooltip:NumLines() do
+            local line = _G["ForeverClassesPoisonScanTooltipTextLeft" .. i]
+            if line then
+                local text = line:GetText()
+                if text then
+                    local lower = string.lower(text)
+                    if string.find(lower, "coats your weapon") or string.find(lower, "coats a weapon") or
+                       string.find(lower, "coat your weapon") or string.find(lower, "apply a poison to your weapon") then
+                        isPoison = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    FC.poisonCache[itemID] = isPoison
+    if isPoison then
+        return true, itemName or ("Poison #" .. itemID), itemTexture, itemQuality
+    end
+    return false
+end
+
+function FC:ScanPoisonsInBags()
+    local poisonsFound = {}
+    local itemCounts = {}
+
+    local getNumSlots = C_Container and C_Container.GetContainerNumSlots or _G.GetContainerNumSlots
+    local getItemID   = C_Container and C_Container.GetContainerItemID or _G.GetContainerItemID
+    local getItemLink = C_Container and C_Container.GetContainerItemLink or _G.GetContainerItemLink
+    local getItemInfo = C_Container and C_Container.GetContainerItemInfo or _G.GetContainerItemInfo
+
+    local numBags = NUM_BAG_SLOTS or 4
+    for bag = 0, numBags do
+        local numSlots = getNumSlots and getNumSlots(bag) or 0
+        for slot = 1, numSlots do
+            local itemID = getItemID and getItemID(bag, slot)
+            if itemID then
+                local link = getItemLink and getItemLink(bag, slot)
+                local isPoison, name, texture, quality = FC:IsPoisonItem(itemID, link)
+                if isPoison then
+                    local stackCount = 1
+                    local info = getItemInfo and getItemInfo(bag, slot)
+                    if type(info) == "table" and info.stackCount then
+                        stackCount = info.stackCount
+                    elseif type(info) == "number" then
+                        stackCount = info
+                    end
+
+                    if not itemCounts[itemID] then
+                        itemCounts[itemID] = {
+                            itemID = itemID,
+                            name = name or ("Poison " .. itemID),
+                            texture = texture or "Interface\\Icons\\Ability_Poisons",
+                            quality = quality or 1,
+                            count = stackCount,
+                            link = link,
+                        }
+                    else
+                        itemCounts[itemID].count = itemCounts[itemID].count + stackCount
+                    end
+                end
+            end
+        end
+    end
+
+    for _, data in pairs(itemCounts) do
+        table.insert(poisonsFound, data)
+    end
+
+    table.sort(poisonsFound, function(a, b)
+        local isLastA = (a.itemID == ForeverClassesDB.lastPoisonMH or a.itemID == ForeverClassesDB.lastPoisonOH)
+        local isLastB = (b.itemID == ForeverClassesDB.lastPoisonMH or b.itemID == ForeverClassesDB.lastPoisonOH)
+        if isLastA ~= isLastB then return isLastA end
+        return (a.name or "") < (b.name or "")
+    end)
+
+    return poisonsFound
+end
+
+function FC:GetWeaponEnchantNameAndIcon(slotID, enchantID)
+    if not enchantID then return nil, nil end
+
+    if FC.poisonEnchantCache[enchantID] then
+        return FC.poisonEnchantCache[enchantID].name, FC.poisonEnchantCache[enchantID].icon
+    end
+
+    if InCombatLockdown and InCombatLockdown() then
+        local lastID = (slotID == 16) and ForeverClassesDB.lastPoisonMH or ForeverClassesDB.lastPoisonOH
+        if lastID then
+            local name, _, _, _, _, _, _, _, _, icon = SafeGetItemInfo(lastID)
+            return name, icon
+        end
+        return "Poison", "Interface\\Icons\\Ability_Poisons"
+    end
+
+    local enchantName = nil
+    if C_TooltipInfo and C_TooltipInfo.GetInventoryItem then
+        local data = C_TooltipInfo.GetInventoryItem("player", slotID)
+        if data and data.lines then
+            for _, line in ipairs(data.lines) do
+                local text = line.leftText
+                local r, g, b = line.leftColor and line.leftColor.r, line.leftColor and line.leftColor.g, line.leftColor and line.leftColor.b
+                if text and r and g and b and (g > 0.7 and r < 0.35 and b < 0.35) then
+                    local clean = string.match(text, "^(.-)%s*%(") or text
+                    clean = string.gsub(clean, "%s+$", "")
+                    enchantName = clean
+                    break
+                end
+            end
+        end
+    end
+
+    if not enchantName then
+        poisonScanTooltip:ClearLines()
+        poisonScanTooltip:SetInventoryItem("player", slotID)
+        for i = 1, poisonScanTooltip:NumLines() do
+            local line = _G["ForeverClassesPoisonScanTooltipTextLeft" .. i]
+            if line then
+                local r, g, b = line:GetTextColor()
+                local text = line:GetText()
+                if text and (g > 0.7 and r < 0.35 and b < 0.35) then
+                    local clean = string.match(text, "^(.-)%s*%(") or text
+                    clean = string.gsub(clean, "%s+$", "")
+                    enchantName = clean
+                    break
+                end
+            end
+        end
+    end
+
+    local icon = nil
+    if enchantName then
+        local _, _, _, _, _, _, _, _, _, itemTexture = SafeGetItemInfo(enchantName)
+        if itemTexture then
+            icon = itemTexture
+        else
+            local lower = string.lower(enchantName)
+            if string.find(lower, "deadly") then
+                icon = "Interface\\Icons\\Ability_Rogue_DualWeild"
+            elseif string.find(lower, "crippling") then
+                icon = "Interface\\Icons\\Ability_Poison"
+            elseif string.find(lower, "wound") then
+                icon = "Interface\\Icons\\INV_Misc_Herb_16"
+            elseif string.find(lower, "mind") then
+                icon = "Interface\\Icons\\Spell_Nature_NullifyDisease"
+            elseif string.find(lower, "anesthetic") then
+                icon = "Interface\\Icons\\Spell_Nature_SlowPoison"
+            else
+                icon = "Interface\\Icons\\Ability_Poisons"
+            end
+        end
+    end
+
+    if enchantName and icon then
+        FC.poisonEnchantCache[enchantID] = { name = enchantName, icon = icon }
+    end
+
+    return enchantName, icon
+end
+
+function FC:UpdatePoisonSlot(slot, hasEnchant, expirationMs, charges, enchantID)
+    if not slot then return end
+
+    if hasEnchant then
+        local secondsLeft = math.floor((expirationMs or 0) / 1000)
+        slot.currentExp = secondsLeft
+        slot.currentCharges = charges
+
+        if slot.lastEnchantID ~= enchantID or not slot.poisonName then
+            slot.lastEnchantID = enchantID
+            local name, icon = FC:GetWeaponEnchantNameAndIcon(slot.slotID, enchantID)
+            slot.poisonName = name
+            slot.poisonIcon = icon
+        end
+
+        if slot.poisonIcon then
+            slot.icon:SetTexture(slot.poisonIcon)
+        else
+            slot.icon:SetTexture("Interface\\Icons\\Ability_Poisons")
+        end
+        slot.icon:SetDesaturated(false)
+        slot.plusIcon:Hide()
+
+        local threshold = ForeverClassesDB.poisonAlertThreshold or 15
+        local isLow = false
+        if charges and charges > 0 and charges <= threshold then
+            isLow = true
+        elseif secondsLeft > 0 and secondsLeft <= 120 then
+            isLow = true
+        end
+
+        if isLow then
+            slot.state = "LOW"
+            slot:SetBackdropBorderColor(1.0, 0.72, 0.1, 0.95)
+            slot.glow:Show()
+
+            if ForeverClassesDB.poisonSoundAlert and (slot.lastCharges and slot.lastCharges > threshold) then
+                PlaySound(8959, "Master")
+            end
+        else
+            slot.state = "ACTIVE"
+            slot:SetBackdropBorderColor(0.0, 0.95, 0.6, 0.95)
+            slot.glow:Hide()
+        end
+
+        if charges and charges > 0 then
+            slot.chargesText:SetText(charges)
+            if charges > 20 then
+                slot.chargesText:SetTextColor(0.2, 1.0, 0.4)
+            elseif charges > threshold then
+                slot.chargesText:SetTextColor(1.0, 0.85, 0.1)
+            else
+                slot.chargesText:SetTextColor(1.0, 0.25, 0.25)
+            end
+        else
+            slot.chargesText:SetText("")
+        end
+
+        if slot.durationBar then
+            slot.durationBar:Show()
+            slot.durationBar:SetValue(math.min(secondsLeft, 1800))
+            if isLow then
+                slot.durationBar:SetStatusBarColor(1.0, 0.70, 0.10, 0.9)
+            else
+                slot.durationBar:SetStatusBarColor(0.0, 0.95, 0.60, 0.85)
+            end
+        end
+
+        slot.lastCharges = charges
+    else
+        slot.poisonName = nil
+        slot.poisonIcon = nil
+        slot.currentExp = nil
+        slot.currentCharges = nil
+        slot.lastEnchantID = nil
+        slot.lastCharges = nil
+        slot.state = "MISSING"
+
+        local equipTexture = GetInventoryItemTexture and GetInventoryItemTexture("player", slot.slotID)
+        if equipTexture then
+            slot.icon:SetTexture(equipTexture)
+        else
+            if slot.slotID == 16 then
+                slot.icon:SetTexture("Interface\\Icons\\INV_Sword_04")
+            else
+                slot.icon:SetTexture("Interface\\Icons\\INV_Weapon_ShortBlade_05")
+            end
+        end
+        slot.icon:SetDesaturated(true)
+        slot.plusIcon:Show()
+
+        slot.chargesText:SetText("")
+        if slot.durationBar then slot.durationBar:Hide() end
+        slot.glow:Hide()
+        slot:SetBackdropBorderColor(0.9, 0.2, 0.2, 0.95)
+    end
+end
+
+function FC:UpdatePoisonTracker()
+    if not FC.PoisonBar then return end
+
+    local _, classToken = UnitClass("player")
+    if classToken ~= "ROGUE" then
+        FC.PoisonBar:Hide()
+        return
+    end
+
+    if ForeverClassesDB and ForeverClassesDB.showPoisonTracker == false then
+        FC.PoisonBar:Hide()
+        return
+    end
+
+    local hasMH, mhExp, mhCharges, mhEnchantID, hasOH, ohExp, ohCharges, ohEnchantID = GetWeaponEnchantInfo()
+    FC:UpdatePoisonSlot(FC.PoisonMH, hasMH, mhExp, mhCharges, mhEnchantID)
+    FC:UpdatePoisonSlot(FC.PoisonOH, hasOH, ohExp, ohCharges, ohEnchantID)
+
+    if ForeverClassesDB.poisonAutoHide then
+        local mhActive = FC.PoisonMH and FC.PoisonMH.state == "ACTIVE"
+        local ohActive = FC.PoisonOH and FC.PoisonOH.state == "ACTIVE"
+        if mhActive and ohActive then
+            if FC.PoisonBar:IsShown() and not (FC.PoisonFlyout and FC.PoisonFlyout:IsShown()) then
+                FC.PoisonBar:Hide()
+            end
+            return
+        end
+    end
+
+    FC.PoisonBar:Show()
+end
+
+-- ============================================================================
+-- Rogue Quick-Apply Flyout Menu (SecureActionButton Macro Executor)
+-- ============================================================================
+
+local poisonFlyoutButtons = {}
+
+function FC:GetOrCreatePoisonFlyout()
+    if FC.PoisonFlyout then return FC.PoisonFlyout end
+
+    local flyout = CreateFrame("Frame", "ForeverClassesPoisonFlyout", UIParent, BackdropTemplateString)
+    flyout:SetClampedToScreen(true)
+    flyout:SetFrameStrata("DIALOG")
+    flyout:SetFrameLevel(50)
+    flyout:EnableMouse(true)
+    flyout:Hide()
+
+    flyout:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    flyout:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
+    flyout:SetBackdropBorderColor(0.0, 0.95, 0.60, 0.95)
+
+    local title = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    title:SetPoint("TOP", flyout, "TOP", 0, -4)
+    title:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    title:SetJustifyH("CENTER")
+    title:SetText("MH")
+    title:SetTextColor(0, 1, 0.6)
+    flyout.title = title
+
+    local emptyText = flyout:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    emptyText:SetPoint("CENTER", flyout, "CENTER", 0, -4)
+    emptyText:SetText("|cffff4444No poisons in bags!|r")
+    emptyText:Hide()
+    flyout.emptyText = emptyText
+
+    tinsert(UISpecialFrames, "ForeverClassesPoisonFlyout")
+
+    local dismiss = CreateFrame("Button", "ForeverClassesPoisonFlyoutDismiss", UIParent)
+    dismiss:SetAllPoints(UIParent)
+    dismiss:SetFrameStrata("HIGH")
+    dismiss:SetFrameLevel(10)
+    dismiss:RegisterForClicks("LeftButtonDown", "LeftButtonUp", "RightButtonDown", "RightButtonUp")
+    dismiss:Hide()
+    dismiss:SetScript("OnClick", function()
+        FC:HidePoisonFlyout()
+    end)
+    flyout.dismiss = dismiss
+
+    flyout:SetScript("OnShow", function(self)
+        dismiss:Show()
+    end)
+    flyout:SetScript("OnHide", function()
+        dismiss:Hide()
+    end)
+
+    FC.PoisonFlyout = flyout
+    return flyout
+end
+
+local function GetPoisonFlyoutButton(index, parent)
+    if poisonFlyoutButtons[index] then
+        return poisonFlyoutButtons[index]
+    end
+
+    local template = "SecureActionButtonTemplate" .. (BackdropTemplateString and (", " .. BackdropTemplateString) or "")
+    local btn = CreateFrame("Button", "ForeverClassesPoisonApplyBtn" .. index, parent, template)
+    btn:SetSize(32, 32)
+    btn:SetFrameLevel(parent:GetFrameLevel() + 2)
+    btn:RegisterForClicks("AnyUp", "AnyDown")
+
+    btn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 }
+    })
+    btn:SetBackdropColor(0.12, 0.12, 0.15, 0.9)
+    btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.8)
+
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    icon:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+    icon:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 1)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    btn.icon = icon
+
+    local countText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    countText:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 1)
+    countText:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    countText:SetTextColor(1, 0.82, 0.1)
+    btn.countText = countText
+
+    local activeMark = btn:CreateTexture(nil, "OVERLAY")
+    activeMark:SetSize(8, 8)
+    activeMark:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -1, -1)
+    activeMark:SetColorTexture(0.0, 1.0, 0.8, 1.0)
+    activeMark:Hide()
+    btn.activeMark = activeMark
+
+    local hl = btn:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(btn)
+    hl:SetColorTexture(0, 1, 0.6, 0.25)
+
+    btn:SetScript("OnEnter", function(self)
+        if self.itemLink then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(self.itemLink)
+            GameTooltip:Show()
+        elseif self.itemID then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetItemByID(self.itemID)
+            GameTooltip:Show()
+        end
+    end)
+    btn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    btn:SetScript("PostClick", function(self)
+        if self.itemID and parent.currentTargetSlot then
+            if parent.currentTargetSlot == 16 then
+                ForeverClassesDB.lastPoisonMH = self.itemID
+            else
+                ForeverClassesDB.lastPoisonOH = self.itemID
+            end
+        end
+        FC:HidePoisonFlyout()
+    end)
+
+    poisonFlyoutButtons[index] = btn
+    return btn
+end
+
+function FC:HidePoisonFlyout()
+    if FC.PoisonFlyout and FC.PoisonFlyout:IsShown() then
+        FC.PoisonFlyout:Hide()
+    end
+end
+
+function FC:PopulatePoisonFlyoutItems()
+    local menu = FC.PoisonFlyout
+    if not menu or not menu.currentTargetSlot then return end
+
+    local poisons = FC:ScanPoisonsInBags()
+    local numPoisons = #poisons
+
+    for _, btn in ipairs(poisonFlyoutButtons) do
+        btn:Hide()
+    end
+
+    if numPoisons == 0 then
+        menu:SetSize(140, 48)
+        menu.emptyText:Show()
+        return
+    end
+
+    menu.emptyText:Hide()
+
+    local btnSize = 34
+    local spacing = 3
+    local padding = 3
+    local headerH = 16
+
+    local totalHeight = headerH + (numPoisons * (btnSize + spacing)) + padding
+    menu:SetSize(40, totalHeight)
+
+    local currentSlot = (menu.currentTargetSlot == 16) and FC.PoisonMH or FC.PoisonOH
+    local activeName = currentSlot and currentSlot.poisonName
+
+    for i, poison in ipairs(poisons) do
+        local btn = GetPoisonFlyoutButton(i, menu)
+        btn:ClearAllPoints()
+        btn:SetPoint("TOPLEFT", menu, "TOPLEFT", padding, -headerH - ((i - 1) * (btnSize + spacing)))
+        btn:SetSize(btnSize, btnSize)
+
+        btn.itemID = poison.itemID
+        btn.itemLink = poison.link
+        btn.icon:SetTexture(poison.texture)
+        btn.countText:SetText(poison.count > 1 and ("x" .. poison.count) or "")
+
+        local isActive = (activeName and string.find(poison.name, activeName, 1, true))
+        if isActive then
+            btn.activeMark:Show()
+            btn:SetBackdropBorderColor(0.0, 1.0, 0.8, 1.0)
+        else
+            btn.activeMark:Hide()
+            btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 0.8)
+        end
+
+        local macroText = string.format("/use item:%d\n/use %d", poison.itemID, menu.currentTargetSlot)
+        btn:SetAttribute("type", "macro")
+        btn:SetAttribute("macrotext", macroText)
+
+        btn:Show()
+    end
+end
+
+function FC:TogglePoisonFlyout(anchorFrame, targetSlotID)
+    if InCombatLockdown and InCombatLockdown() then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff[ForeverClasses]|r |cffff2020Cannot modify poisons in combat!|r")
+        return
+    end
+
+    local menu = FC:GetOrCreatePoisonFlyout()
+    if menu:IsShown() and menu.currentTargetSlot == targetSlotID then
+        menu:Hide()
+        return
+    end
+
+    menu.currentTargetSlot = targetSlotID
+    menu.anchorFrame = anchorFrame
+
+    local handName = (targetSlotID == 16) and "MH" or "OH"
+    menu.title:SetText(handName)
+
+    menu:ClearAllPoints()
+    local frameTop = anchorFrame:GetTop() or 0
+    local screenHeight = GetScreenHeight and GetScreenHeight() or 768
+    local openDownwards = (frameTop > (screenHeight - 180))
+
+    if openDownwards then
+        menu:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, -4)
+    else
+        menu:SetPoint("BOTTOMLEFT", anchorFrame, "TOPLEFT", 0, 4)
+    end
+
+    FC:PopulatePoisonFlyoutItems()
+    menu:Show()
+end
+
+function FC:OnBagUpdateDelayed()
+    if InCombatLockdown and InCombatLockdown() then return end
+    if FC.PoisonFlyout and FC.PoisonFlyout:IsShown() and FC.PoisonFlyout.currentTargetSlot then
+        FC:PopulatePoisonFlyoutItems()
+    end
+end
+
+function FC:CheckMissingPoisonReminder(triggerContext)
+    if not ForeverClassesDB or ForeverClassesDB.poisonReminders == false then return end
+    local _, classToken = UnitClass("player")
+    if classToken ~= "ROGUE" then return end
+
+    local hasMH, _, _, _, hasOH = GetWeaponEnchantInfo()
+    if not hasMH or not hasOH then
+        local missing = {}
+        if not hasMH then table.insert(missing, "Main-Hand") end
+        if not hasOH then table.insert(missing, "Off-Hand") end
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00ccff[ForeverClasses]|r |cffffd100Poison Reminder (%s):|r Missing poison on |cffff4444%s|r weapon!", triggerContext or "Notice", table.concat(missing, " & ")))
+        if ForeverClassesDB.poisonSoundAlert ~= false then
+            PlaySound(8959, "Master")
+        end
+    end
+end
 
 function FC:FormatTotemTime(s)
     if not s or s <= 0 then return "" end
@@ -7525,6 +8324,10 @@ pcall(eventFrame.RegisterEvent, eventFrame, "COMBAT_TEXT_UPDATE")
 pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_CONFIG_UPDATED")
 pcall(eventFrame.RegisterEvent, eventFrame, "TRAIT_NODE_CHANGED")
 pcall(eventFrame.RegisterEvent, eventFrame, "ACTIVE_COMBAT_CONFIG_CHANGED")
+pcall(eventFrame.RegisterEvent, eventFrame, "UNIT_INVENTORY_CHANGED")
+pcall(eventFrame.RegisterUnitEvent, eventFrame, "UNIT_INVENTORY_CHANGED", "player")
+pcall(eventFrame.RegisterEvent, eventFrame, "BAG_UPDATE_DELAYED")
+pcall(eventFrame.RegisterEvent, eventFrame, "READY_CHECK")
 
 local function HandleStormstrikeDodgeOrParry()
     local _, classToken = UnitClass("player")
@@ -7613,6 +8416,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
         FC:UpdatePower()
         pcall(function() FC:UpdateComboPoints() end)
         pcall(function() FC:UpdateTotems() end)
+        pcall(function() FC:UpdatePoisonTracker() end)
         pcall(function() FC:UpdateDebuffs() end)
         pcall(function() FC:UpdateCooldowns() end)
         if FC.CreateMinimapButton then
@@ -7646,6 +8450,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
         FC:UpdatePower()
         pcall(function() FC:UpdateComboPoints() end)
         pcall(function() FC:UpdateTotems() end)
+        pcall(function() FC:UpdatePoisonTracker() end)
         pcall(function() FC:UpdateDebuffs() end)
         pcall(function() FC:UpdateCooldowns() end)
         if FC.CreateMinimapButton then
@@ -7653,6 +8458,11 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
         end
         if FC.AttachEssentialCooldowns then
             pcall(FC.AttachEssentialCooldowns, FC)
+        end
+        if C_Timer and C_Timer.After then
+            C_Timer.After(3, function()
+                if FC.CheckMissingPoisonReminder then pcall(FC.CheckMissingPoisonReminder, FC, "Entered World") end
+            end)
         end
         collectgarbage("collect")
     elseif event == "PLAYER_LOGOUT" then
@@ -7665,6 +8475,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
         end
     elseif event == "PLAYER_REGEN_DISABLED" then
         if FC.HideFlyout then FC:HideFlyout() end
+        if FC.HidePoisonFlyout then FC:HidePoisonFlyout() end
         FC.inCombat = true
         FC.previousComboPoints = 0
         FC.needsCooldownRefresh = true
@@ -7692,9 +8503,19 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
         if FC.SanitizeCooldownSlots then pcall(FC.SanitizeCooldownSlots, FC) end
         pcall(function() FC:UpdateCooldowns() end)
         pcall(function() FC:UpdateTotems() end)
+        pcall(function() FC:UpdatePoisonTracker() end)
+        if FC.CheckMissingPoisonReminder then pcall(FC.CheckMissingPoisonReminder, FC, "Exited Combat") end
         if FC.AttachEssentialCooldowns then
             pcall(FC.AttachEssentialCooldowns, FC)
         end
+    elseif event == "UNIT_INVENTORY_CHANGED" then
+        if arg1 == "player" or arg1 == nil then
+            if FC.UpdatePoisonTracker then pcall(FC.UpdatePoisonTracker, FC) end
+        end
+    elseif event == "BAG_UPDATE_DELAYED" then
+        if FC.OnBagUpdateDelayed then pcall(FC.OnBagUpdateDelayed, FC) end
+    elseif event == "READY_CHECK" then
+        if FC.CheckMissingPoisonReminder then pcall(FC.CheckMissingPoisonReminder, FC, "Ready Check") end
     elseif event == "PLAYER_TARGET_CHANGED" or event == "UNIT_COMBO_POINTS" then
         if event == "PLAYER_TARGET_CHANGED" then
             FC.previousComboPoints = 0
