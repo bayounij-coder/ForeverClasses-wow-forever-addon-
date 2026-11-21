@@ -1382,7 +1382,7 @@ function FC:CreateHUD()
 
     local pips = {}
     local MAX_COMBO_POINTS = 5
-    local circleSize = 20
+    local circleSize = 16
     local gap = 4
     local totalWidth = (MAX_COMBO_POINTS * circleSize) + ((MAX_COMBO_POINTS - 1) * gap)
     local startLeft = math.floor((db.barWidth - totalWidth) / 2 + 0.5)
@@ -1478,7 +1478,7 @@ function FC:CreateHUD()
 
     local function CreatePoisonSlot(parent, slotID, handLabel, alignPoint, xOffset)
         local slot = CreateFrame("Button", "ForeverClassesPoisonSlot" .. handLabel, parent, BackdropTemplateString)
-        slot:SetSize(60, 22)
+        slot:SetSize(64, 22)
         slot:SetPoint(alignPoint, parent, alignPoint, xOffset, 0)
         slot.slotID = slotID
         slot.handLabel = handLabel
@@ -1496,22 +1496,22 @@ function FC:CreateHUD()
         slot:SetBackdropBorderColor(0.0, 0.95, 0.60, 0.95)
 
         local glyph = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        glyph:SetPoint("LEFT", slot, "LEFT", 3, 0)
+        glyph:SetPoint("LEFT", slot, "LEFT", 4, 0)
         glyph:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
         glyph:SetText(handLabel)
         glyph:SetTextColor(0.70, 0.75, 0.85, 0.9)
         slot.glyph = glyph
 
         local icon = slot:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(15, 15)
-        icon:SetPoint("LEFT", glyph, "RIGHT", 2, 0)
+        icon:SetSize(14, 14)
+        icon:SetPoint("LEFT", glyph, "RIGHT", 3, 0)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         slot.icon = icon
 
         local chargesText = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        chargesText:SetPoint("RIGHT", slot, "RIGHT", -3, 0)
-        chargesText:SetJustifyH("RIGHT")
-        chargesText:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+        chargesText:SetPoint("LEFT", icon, "RIGHT", 3, 0)
+        chargesText:SetJustifyH("LEFT")
+        chargesText:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
         chargesText:SetText("")
         chargesText:SetTextColor(0.0, 0.95, 0.60, 1.0)
         chargesText:SetShadowColor(0, 0, 0, 0.9)
@@ -7065,7 +7065,7 @@ function FC:LayoutComboPips()
     FC.ComboFrame:SetSize(barWidth, 24)
 
     local MAX_COMBO_POINTS = 5
-    local circleSize = 20
+    local circleSize = 16
     local gap = 4
     local totalWidth = (MAX_COMBO_POINTS * circleSize) + ((MAX_COMBO_POINTS - 1) * gap)
     local startLeft = math.floor((barWidth - totalWidth) / 2 + 0.5)
