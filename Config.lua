@@ -575,33 +575,39 @@ function FC:CreateConfigWindow()
     -- Main HUD Cluster Center Anchor
     local hudCluster = CreateFrame("Frame", nil, previewSandbox)
     hudCluster:SetSize(240, 84)
-    hudCluster:SetPoint("CENTER", previewSandbox, "CENTER", 0, -2)
+    hudCluster:SetPoint("CENTER", previewSandbox, "CENTER", 0, -6)
 
-    -- 1. Docked Ability Slots (Above Health Bar)
+    -- 2. Health Bar Container
+    local previewHealthContainer = CreateFrame("Frame", nil, hudCluster, BackdropTemplateString)
+    previewHealthContainer:SetSize(240, 22)
+    previewHealthContainer:SetPoint("TOPLEFT", hudCluster, "TOPLEFT", 0, 0)
+    ApplyWHITE8X8Backdrop(previewHealthContainer, 0.02, 0.02, 0.02, 0.9, 0.18, 0.20, 0.26, 0.8, 1)
+
+    -- 1. Docked Ability Slots (Above Health Bar, anchored directly to Health Bar)
     local previewSlotsDock = CreateFrame("Frame", nil, hudCluster)
-    previewSlotsDock:SetHeight(20)
-    previewSlotsDock:SetPoint("BOTTOM", hudCluster, "TOP", 0, -20)
+    previewSlotsDock:SetHeight(32)
+    previewSlotsDock:SetPoint("BOTTOM", previewHealthContainer, "TOP", 0, 2)
 
     local previewSlotBtns = {}
     for i = 1, 7 do
         local slot = CreateFrame("Frame", nil, previewSlotsDock, BackdropTemplateString)
-        slot:SetSize(20, 20)
-        slot:SetPoint("LEFT", previewSlotsDock, "LEFT", (i - 1) * 23, 0)
-        ApplyWHITE8X8Backdrop(slot, 0.12, 0.14, 0.18, 0.95, 0.24, 0.28, 0.36, 0.8, 1)
+        slot:SetSize(32, 32)
+        ApplyWHITE8X8Backdrop(slot, 0.10, 0.12, 0.16, 0.95, 0.22, 0.25, 0.32, 0.85, 1)
+
+        local icon = slot:CreateTexture(nil, "BACKGROUND")
+        icon:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
+        icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        slot.icon = icon
 
         local slotNum = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         slotNum:SetPoint("CENTER", slot, "CENTER", 0, 0)
         slotNum:SetText(tostring(i))
         slotNum:SetTextColor(0.6, 0.65, 0.75, 1)
+        slot.slotNum = slotNum
 
         previewSlotBtns[i] = slot
     end
-
-    -- 2. Health Bar Container
-    local previewHealthContainer = CreateFrame("Frame", nil, hudCluster, BackdropTemplateString)
-    previewHealthContainer:SetSize(240, 22)
-    previewHealthContainer:SetPoint("TOPLEFT", hudCluster, "TOPLEFT", 0, -24)
-    ApplyWHITE8X8Backdrop(previewHealthContainer, 0.02, 0.02, 0.02, 0.9, 0.18, 0.20, 0.26, 0.8, 1)
 
     -- Health Fill
     local previewHealthFill = previewHealthContainer:CreateTexture(nil, "BORDER")
@@ -743,20 +749,65 @@ function FC:CreateConfigWindow()
             slotCount = (ForeverClassesDB.showCooldowns == false) and 0 or 7
         end
 
-        -- 1. Slots Dock
+        -- 1. Slots Dock (Dynamically spanning 240px exactly like the live HUD engine)
         if slotCount == 0 then
             previewSlotsDock:Hide()
         else
             previewSlotsDock:Show()
+            local availW = 240
+            local gap = 2
+            local size = 32
+            if slotCount >= 4 then
+                local totalGap = (slotCount - 1) * gap
+                size = (availW - totalGap) / slotCount
+                if size > 64 then size = 64 end
+            elseif slotCount == 3 then
+                size = math.min(54, (availW - (2 * gap)) / 3)
+            elseif slotCount == 2 then
+                size = math.min(52, (availW - gap) / 2)
+            else
+                size = 48
+                gap = 0
+            end
+
+            local totalW = (slotCount * size) + ((slotCount - 1) * gap)
+            previewSlotsDock:SetSize(totalW, size)
+
+            local fontSize = math.max(10, math.min(16, math.floor(size * 0.38)))
+            local charData = FC.GetCharData and FC:GetCharData()
+
             for i = 1, 7 do
+                local slot = previewSlotBtns[i]
                 if i <= slotCount then
-                    previewSlotBtns[i]:Show()
+                    slot:SetSize(size, size)
+                    slot:ClearAllPoints()
+                    slot:SetPoint("LEFT", previewSlotsDock, "LEFT", (i - 1) * (size + gap), 0)
+                    slot:Show()
+
+                    local spellID = charData and charData.cooldownSlots and charData.cooldownSlots[i]
+                    local spellTex = nil
+                    if spellID and not (InCombatLockdown and InCombatLockdown()) then
+                        if C_Spell and C_Spell.GetSpellTexture then
+                            spellTex = C_Spell.GetSpellTexture(spellID)
+                        elseif GetSpellTexture then
+                            spellTex = GetSpellTexture(spellID)
+                        end
+                    end
+
+                    if spellTex then
+                        slot.icon:SetTexture(spellTex)
+                        slot.icon:Show()
+                        slot.slotNum:Hide()
+                    else
+                        slot.icon:Hide()
+                        slot.slotNum:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+                        slot.slotNum:SetText(tostring(i))
+                        slot.slotNum:Show()
+                    end
                 else
-                    previewSlotBtns[i]:Hide()
+                    slot:Hide()
                 end
             end
-            local totalW = (slotCount * 20) + ((slotCount - 1) * 3)
-            previewSlotsDock:SetWidth(math.max(20, totalW))
         end
 
         -- 2. Health Bar Color
