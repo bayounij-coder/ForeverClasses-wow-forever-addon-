@@ -574,13 +574,12 @@ function FC:CreateConfigWindow()
 
     -- Main HUD Cluster Center Anchor
     local hudCluster = CreateFrame("Frame", nil, previewSandbox)
-    hudCluster:SetSize(240, 84)
-    hudCluster:SetPoint("CENTER", previewSandbox, "CENTER", 0, -6)
+    hudCluster:SetAllPoints(previewSandbox)
 
     -- 2. Health Bar Container
     local previewHealthContainer = CreateFrame("Frame", nil, hudCluster, BackdropTemplateString)
     previewHealthContainer:SetSize(240, 22)
-    previewHealthContainer:SetPoint("TOPLEFT", hudCluster, "TOPLEFT", 0, 0)
+    previewHealthContainer:SetPoint("TOP", hudCluster, "CENTER", 0, 2)
     ApplyWHITE8X8Backdrop(previewHealthContainer, 0.02, 0.02, 0.02, 0.9, 0.18, 0.20, 0.26, 0.8, 1)
 
     -- 1. Docked Ability Slots (Above Health Bar, anchored directly to Health Bar)
@@ -742,6 +741,26 @@ function FC:CreateConfigWindow()
         if slotCount == nil then
             slotCount = (ForeverClassesDB.showCooldowns == false) and 0 or 7
         end
+
+        -- Dynamic Vertical Centering (Balancing the entire HUD stack in the preview sandbox)
+        local hasSlots = (slotCount > 0)
+        local topHeight = hasSlots and 27 or 0
+        local hasSubBar = false
+        local subBarH = 0
+        if playerClass == "SHAMAN" and showTotems then
+            hasSubBar = true
+            subBarH = 26 -- 4px gap + 22px totem buttons
+        elseif (playerClass == "ROGUE" or playerClass == "DRUID") and showCP then
+            hasSubBar = true
+            subBarH = 22 -- 4px gap + 18px combo pips
+        end
+
+        local bottomHeight = 35 + (hasSubBar and subBarH or 0) -- 22 health + 1 gap + 12 power + subBar
+        local totalClusterH = topHeight + bottomHeight
+        local healthTop = math.floor((totalClusterH / 2) - topHeight) - 2
+
+        previewHealthContainer:ClearAllPoints()
+        previewHealthContainer:SetPoint("TOP", hudCluster, "CENTER", 0, healthTop)
 
         -- 1. Slots Dock (Sleek 24px height, dynamically fitting across the 240px health bar)
         if slotCount == 0 then
