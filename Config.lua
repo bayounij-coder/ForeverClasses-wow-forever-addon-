@@ -585,25 +585,19 @@ function FC:CreateConfigWindow()
 
     -- 1. Docked Ability Slots (Above Health Bar, anchored directly to Health Bar)
     local previewSlotsDock = CreateFrame("Frame", nil, hudCluster)
-    previewSlotsDock:SetHeight(32)
-    previewSlotsDock:SetPoint("BOTTOM", previewHealthContainer, "TOP", 0, 2)
+    previewSlotsDock:SetHeight(24)
+    previewSlotsDock:SetPoint("BOTTOM", previewHealthContainer, "TOP", 0, 3)
 
     local previewSlotBtns = {}
     for i = 1, 7 do
         local slot = CreateFrame("Frame", nil, previewSlotsDock, BackdropTemplateString)
-        slot:SetSize(32, 32)
-        ApplyWHITE8X8Backdrop(slot, 0.10, 0.12, 0.16, 0.95, 0.22, 0.25, 0.32, 0.85, 1)
-
-        local icon = slot:CreateTexture(nil, "BACKGROUND")
-        icon:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
-        icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        slot.icon = icon
+        slot:SetSize(32, 24)
+        ApplyWHITE8X8Backdrop(slot, 0.08, 0.10, 0.14, 0.95, 0.22, 0.28, 0.38, 0.9, 1)
 
         local slotNum = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         slotNum:SetPoint("CENTER", slot, "CENTER", 0, 0)
         slotNum:SetText(tostring(i))
-        slotNum:SetTextColor(0.6, 0.65, 0.75, 1)
+        slotNum:SetTextColor(0.80, 0.85, 0.95, 1)
         slot.slotNum = slotNum
 
         previewSlotBtns[i] = slot
@@ -749,86 +743,42 @@ function FC:CreateConfigWindow()
             slotCount = (ForeverClassesDB.showCooldowns == false) and 0 or 7
         end
 
-        -- 1. Slots Dock (Dynamically spanning 240px exactly like the live HUD engine)
+        -- 1. Slots Dock (Sleek 24px height, dynamically fitting across the 240px health bar)
         if slotCount == 0 then
             previewSlotsDock:Hide()
         else
             previewSlotsDock:Show()
             local availW = 240
             local gap = 2
-            local size = 32
+            local slotW = 32
             if slotCount >= 4 then
                 local totalGap = (slotCount - 1) * gap
-                size = (availW - totalGap) / slotCount
-                if size > 64 then size = 64 end
+                slotW = (availW - totalGap) / slotCount
             elseif slotCount == 3 then
-                size = math.min(54, (availW - (2 * gap)) / 3)
+                slotW = math.min(54, (availW - (2 * gap)) / 3)
             elseif slotCount == 2 then
-                size = math.min(52, (availW - gap) / 2)
+                slotW = math.min(52, (availW - gap) / 2)
             else
-                size = 48
+                slotW = 48
                 gap = 0
             end
 
-            local totalW = (slotCount * size) + ((slotCount - 1) * gap)
-            previewSlotsDock:SetSize(totalW, size)
-
-            local fontSize = math.max(10, math.min(16, math.floor(size * 0.38)))
-            local charData = FC.GetCharData and FC:GetCharData()
+            local slotH = 24
+            local totalW = (slotCount * slotW) + ((slotCount - 1) * gap)
+            previewSlotsDock:SetSize(totalW, slotH)
 
             for i = 1, 7 do
                 local slot = previewSlotBtns[i]
                 if i <= slotCount then
-                    slot:SetSize(size, size)
+                    slot:SetSize(slotW, slotH)
                     slot:ClearAllPoints()
-                    slot:SetPoint("LEFT", previewSlotsDock, "LEFT", (i - 1) * (size + gap), 0)
+                    slot:SetPoint("LEFT", previewSlotsDock, "LEFT", (i - 1) * (slotW + gap), 0)
                     slot:Show()
 
-                    local slotData = charData and charData.cooldownSlots and charData.cooldownSlots[i]
-                    local spellTex = nil
-                    if slotData then
-                        if type(slotData) == "table" then
-                            spellTex = slotData.icon
-                            if not spellTex and slotData.id and not (InCombatLockdown and InCombatLockdown()) then
-                                pcall(function()
-                                    if slotData.type == "item" then
-                                        if C_Item and C_Item.GetItemIconByID then
-                                            spellTex = C_Item.GetItemIconByID(slotData.id)
-                                        elseif GetItemIcon then
-                                            spellTex = GetItemIcon(slotData.id)
-                                        end
-                                    else
-                                        if C_Spell and C_Spell.GetSpellTexture then
-                                            spellTex = C_Spell.GetSpellTexture(slotData.id)
-                                        elseif GetSpellTexture then
-                                            spellTex = GetSpellTexture(slotData.id)
-                                        end
-                                    end
-                                end)
-                            end
-                        elseif type(slotData) == "number" or type(slotData) == "string" then
-                            if not (InCombatLockdown and InCombatLockdown()) then
-                                pcall(function()
-                                    if C_Spell and C_Spell.GetSpellTexture then
-                                        spellTex = C_Spell.GetSpellTexture(slotData)
-                                    elseif GetSpellTexture then
-                                        spellTex = GetSpellTexture(slotData)
-                                    end
-                                end)
-                            end
-                        end
-                    end
-
-                    if spellTex then
-                        slot.icon:SetTexture(spellTex)
-                        slot.icon:Show()
-                        slot.slotNum:Hide()
-                    else
-                        slot.icon:Hide()
-                        slot.slotNum:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
-                        slot.slotNum:SetText(tostring(i))
-                        slot.slotNum:Show()
-                    end
+                    slot.slotNum:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
+                    slot.slotNum:SetText(tostring(i))
+                    slot.slotNum:SetTextColor(0.80, 0.85, 0.95, 1.0)
+                    slot.slotNum:Show()
                 else
                     slot:Hide()
                 end
