@@ -455,23 +455,38 @@ function FC:InitDB()
 end
 
 -- ============================================================================
--- Options GUI Window
+-- Options GUI Window (Modern Obsidian Midnight 12.0 Redesign)
 -- ============================================================================
 
 local BackdropTemplateString = BackdropTemplateMixin and "BackdropTemplate" or nil
 
+local function HasClassSupport(classToken)
+    return (classToken == "SHAMAN" or classToken == "ROGUE" or classToken == "DRUID")
+end
+
+local function ApplyWHITE8X8Backdrop(frame, bgR, bgG, bgB, bgA, edgeR, edgeG, edgeB, edgeA, edgeSize)
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = edgeSize or 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+    })
+    frame:SetBackdropColor(bgR or 0.08, bgG or 0.09, bgB or 0.12, bgA or 0.95)
+    frame:SetBackdropBorderColor(edgeR or 0.18, edgeG or 0.20, edgeB or 0.26, edgeA or 0.8)
+end
+
+-- Backward-compatible checkbox helper
 local function CreateCheckbox(parent, labelText, getFunc, setFunc, settingKey)
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cb:SetSize(24, 24)
-    
+    cb:SetSize(22, 22)
+
     cb.text = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    cb.text:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+    cb.text:SetPoint("LEFT", cb, "RIGHT", 6, 0)
     cb.text:SetText(labelText)
 
     cb:SetScript("OnClick", function(self)
         local isChecked = self:GetChecked() and true or false
-        local sound = (SOUNDKIT and SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON) or 856
-        PlaySound(sound)
+        PlaySound((SOUNDKIT and SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON) or 856)
         setFunc(isChecked)
         if settingKey and FC.SaveCharSetting then
             FC:SaveCharSetting(settingKey, isChecked)
@@ -490,8 +505,13 @@ end
 function FC:CreateConfigWindow()
     if FC.ConfigWindow then return FC.ConfigWindow end
 
+    local _, playerClass = UnitClass("player")
+    playerClass = playerClass or "WARRIOR"
+    local hasClassSupport = HasClassSupport(playerClass)
+
+    -- Main Window Shell (Modern Midnight Obsidian Dashboard: 640x620)
     local f = CreateFrame("Frame", "ForeverClassesConfigFrame", UIParent, BackdropTemplateString)
-    f:SetSize(380, 695)
+    f:SetSize(640, 620)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     f:SetFrameStrata("DIALOG")
     f:SetMovable(true)
@@ -501,88 +521,656 @@ function FC:CreateConfigWindow()
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     f:SetClampedToScreen(true)
 
-    f:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 24,
-        insets = { left = 8, right = 8, top = 8, bottom = 8 }
-    })
-    f:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+    -- Obsidian Deep Background with subtle Gold Trim Border
+    ApplyWHITE8X8Backdrop(f, 0.045, 0.048, 0.063, 0.98, 0.78, 0.61, 0.24, 0.35, 1)
 
-    -- Title
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", f, "TOP", 0, -16)
-    title:SetText("|cff00ccffForeverClasses|r |cffffaa00(Beta-Test)|r Settings")
+    table.insert(UISpecialFrames, "ForeverClassesConfigFrame")
+
+    -- ========================================================================
+    -- Window Header
+    -- ========================================================================
+    local header = CreateFrame("Frame", nil, f)
+    header:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -10)
+    header:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -10)
+    header:SetHeight(32)
+
+    -- Emblem Icon (Player Class Crest or FC Monogram)
+    local emblem = header:CreateTexture(nil, "ARTWORK")
+    emblem:SetSize(26, 26)
+    emblem:SetPoint("LEFT", header, "LEFT", 0, 0)
+    local coords = CLASS_ICON_TCOORDS and playerClass and CLASS_ICON_TCOORDS[playerClass]
+    if coords then
+        emblem:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")
+        emblem:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+    else
+        emblem:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+        emblem:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
+
+    local titleText = header:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
+    titleText:SetPoint("LEFT", emblem, "RIGHT", 10, 5)
+    titleText:SetText("|cff00ccffForeverClasses|r |cffffaa00(Beta)|r Settings")
+
+    local subtitleText = header:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    subtitleText:SetPoint("LEFT", emblem, "RIGHT", 10, -8)
+    subtitleText:SetText("Next-Gen Modern Midnight 12.0 Settings Interface")
 
     -- Close Button
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
     closeBtn:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINOPTION_CLOSE or 857)
         f:Hide()
     end)
-    table.insert(UISpecialFrames, "ForeverClassesConfigFrame")
 
-    -- Section 1: Movement & Locking
-    local moveTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    moveTitle:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -50)
-    moveTitle:SetText("Frame Movement:")
+    -- ========================================================================
+    -- TOP SECTION: Live In-Game HUD Preview Sandbox
+    -- ========================================================================
+    local previewSandbox = CreateFrame("Frame", nil, f, BackdropTemplateString)
+    previewSandbox:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
+    previewSandbox:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -46)
+    previewSandbox:SetHeight(138)
+    ApplyWHITE8X8Backdrop(previewSandbox, 0.032, 0.036, 0.048, 0.95, 0.12, 0.14, 0.18, 1.0, 1)
 
-    -- Movement Mode Checkboxes (Radio behavior)
-    local moveFree, moveMod, moveLock
+    local previewBadge = previewSandbox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    previewBadge:SetPoint("TOPLEFT", previewSandbox, "TOPLEFT", 10, -8)
+    previewBadge:SetText("|cff666666LIVE HUD PREVIEW|r")
 
-    moveFree = CreateCheckbox(f, "Free Move (Drag freely without keys)", 
-        function() return ForeverClassesDB.movementMode == "FREE" end,
-        function()
-            ForeverClassesDB.movementMode = "FREE"
-            FC.ConfigWindow:Refresh()
+    -- Main HUD Cluster Center Anchor
+    local hudCluster = CreateFrame("Frame", nil, previewSandbox)
+    hudCluster:SetSize(240, 84)
+    hudCluster:SetPoint("CENTER", previewSandbox, "CENTER", 0, -2)
+
+    -- 1. Docked Ability Slots (Above Health Bar)
+    local previewSlotsDock = CreateFrame("Frame", nil, hudCluster)
+    previewSlotsDock:SetHeight(20)
+    previewSlotsDock:SetPoint("BOTTOM", hudCluster, "TOP", 0, -20)
+
+    local previewSlotBtns = {}
+    for i = 1, 7 do
+        local slot = CreateFrame("Frame", nil, previewSlotsDock, BackdropTemplateString)
+        slot:SetSize(20, 20)
+        slot:SetPoint("LEFT", previewSlotsDock, "LEFT", (i - 1) * 23, 0)
+        ApplyWHITE8X8Backdrop(slot, 0.12, 0.14, 0.18, 0.95, 0.24, 0.28, 0.36, 0.8, 1)
+
+        local slotNum = slot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        slotNum:SetPoint("CENTER", slot, "CENTER", 0, 0)
+        slotNum:SetText(tostring(i))
+        slotNum:SetTextColor(0.6, 0.65, 0.75, 1)
+
+        -- Slot 3 has amber border & ready pip for visual demonstration
+        if i == 3 then
+            slot:SetBackdropBorderColor(0.85, 0.65, 0.20, 0.9)
+            slotNum:SetTextColor(1.0, 0.85, 0.3, 1)
+            local dot = slot:CreateTexture(nil, "OVERLAY")
+            dot:SetSize(4, 4)
+            dot:SetPoint("TOPRIGHT", slot, "TOPRIGHT", -2, -2)
+            dot:SetTexture("Interface\\Buttons\\WHITE8X8")
+            dot:SetVertexColor(1.0, 0.85, 0.3, 1)
         end
-    )
-    moveFree:SetPoint("TOPLEFT", moveTitle, "BOTTOMLEFT", 0, -6)
 
-    moveMod = CreateCheckbox(f, "Hold Key to Move", 
-        function() return ForeverClassesDB.movementMode == "MODIFIER" end,
-        function()
-            ForeverClassesDB.movementMode = "MODIFIER"
-            FC.ConfigWindow:Refresh()
-        end
-    )
-    moveMod:SetPoint("TOPLEFT", moveFree, "BOTTOMLEFT", 0, -4)
-
-    -- Modifier Key Selection buttons (Alt / Shift / Ctrl)
-    local keyGroup = CreateFrame("Frame", nil, f)
-    keyGroup:SetSize(280, 26)
-    keyGroup:SetPoint("TOPLEFT", moveMod, "BOTTOMLEFT", 24, -4)
-
-    local keys = { "ALT", "SHIFT", "CTRL" }
-    local keyBtns = {}
-    for i, k in ipairs(keys) do
-        local btn = CreateFrame("Button", nil, keyGroup, "UIPanelButtonTemplate")
-        btn:SetSize(55, 22)
-        btn:SetPoint("LEFT", keyGroup, "LEFT", (i - 1) * 60, 0)
-        btn:SetText(k)
-        btn:SetScript("OnClick", function()
-            ForeverClassesDB.modifierKey = k
-            FC.ConfigWindow:Refresh()
-            if FC.ApplyConfig then FC:ApplyConfig() end
-        end)
-        keyBtns[k] = btn
+        previewSlotBtns[i] = slot
     end
 
-    moveLock = CreateCheckbox(f, "Locked (Cannot move frame)", 
-        function() return ForeverClassesDB.movementMode == "LOCKED" end,
-        function()
-            ForeverClassesDB.movementMode = "LOCKED"
-            FC.ConfigWindow:Refresh()
+    -- 2. Health Bar Container (with Overshield Cyan Glow Border)
+    local previewHealthContainer = CreateFrame("Frame", nil, hudCluster, BackdropTemplateString)
+    previewHealthContainer:SetSize(240, 22)
+    previewHealthContainer:SetPoint("TOPLEFT", hudCluster, "TOPLEFT", 0, -24)
+    ApplyWHITE8X8Backdrop(previewHealthContainer, 0.02, 0.02, 0.02, 0.9, 0.0, 0.80, 1.0, 0.7, 1)
+
+    -- Health Fill
+    local previewHealthFill = previewHealthContainer:CreateTexture(nil, "BORDER")
+    previewHealthFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    previewHealthFill:SetPoint("TOPLEFT", previewHealthContainer, "TOPLEFT", 1, -1)
+    previewHealthFill:SetPoint("BOTTOMLEFT", previewHealthContainer, "BOTTOMLEFT", 1, 1)
+    previewHealthFill:SetWidth(238 * 0.78)
+    previewHealthFill:SetVertexColor(0.10, 0.75, 0.40, 1.0)
+
+    -- Upcoming Heals Prediction Fill
+    local previewHealFill = previewHealthContainer:CreateTexture(nil, "ARTWORK")
+    previewHealFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    previewHealFill:SetPoint("TOPLEFT", previewHealthFill, "TOPRIGHT", 0, 0)
+    previewHealFill:SetPoint("BOTTOMLEFT", previewHealthFill, "BOTTOMRIGHT", 0, 0)
+    previewHealFill:SetWidth(238 * 0.14)
+    previewHealFill:SetVertexColor(0.30, 0.85, 0.55, 0.45)
+
+    -- Damage Absorption Shield Fill (Native Core Feature)
+    local previewAbsorbFill = previewHealthContainer:CreateTexture(nil, "OVERLAY")
+    previewAbsorbFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    previewAbsorbFill:SetPoint("TOPLEFT", previewHealFill, "TOPRIGHT", 0, 0)
+    previewAbsorbFill:SetPoint("BOTTOMLEFT", previewHealFill, "BOTTOMRIGHT", 0, 0)
+    previewAbsorbFill:SetWidth(238 * 0.08)
+    previewAbsorbFill:SetVertexColor(0.0, 0.80, 1.0, 0.45)
+
+    -- Health Text
+    local previewHealthText = previewHealthContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    previewHealthText:SetPoint("CENTER", previewHealthContainer, "CENTER", 0, 0)
+    previewHealthText:SetText("2,145 / 2,750 (78%)")
+    previewHealthText:SetShadowColor(0, 0, 0, 0.9)
+    previewHealthText:SetShadowOffset(1, -1)
+
+    -- 3. Power Bar Container
+    local previewPowerContainer = CreateFrame("Frame", nil, hudCluster, BackdropTemplateString)
+    previewPowerContainer:SetSize(240, 12)
+    previewPowerContainer:SetPoint("TOPLEFT", previewHealthContainer, "BOTTOMLEFT", 0, -1)
+    ApplyWHITE8X8Backdrop(previewPowerContainer, 0.02, 0.02, 0.02, 0.95, 0.14, 0.16, 0.20, 0.9, 1)
+
+    local previewPowerFill = previewPowerContainer:CreateTexture(nil, "BORDER")
+    previewPowerFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    previewPowerFill:SetPoint("TOPLEFT", previewPowerContainer, "TOPLEFT", 1, -1)
+    previewPowerFill:SetPoint("BOTTOMLEFT", previewPowerContainer, "BOTTOMLEFT", 1, 1)
+    previewPowerFill:SetWidth(238 * 0.85)
+    previewPowerFill:SetVertexColor(0.15, 0.45, 0.95, 1.0)
+
+    local previewPowerText = previewPowerContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    previewPowerText:SetPoint("CENTER", previewPowerContainer, "CENTER", 0, 0)
+    previewPowerText:SetText("3,320 / 3,900 (85%)")
+    previewPowerText:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+    previewPowerText:SetShadowColor(0, 0, 0, 0.9)
+    previewPowerText:SetShadowOffset(1, -1)
+
+    -- 4. Class Sub-Bars Container (Docked below Power Bar)
+    local previewSubBar = CreateFrame("Frame", nil, hudCluster)
+    previewSubBar:SetSize(240, 24)
+    previewSubBar:SetPoint("TOP", previewPowerContainer, "BOTTOM", 0, -4)
+
+    -- Shaman Totem Bar Preview (Real Blizzard Icons & Totem Borders)
+    local previewTotemBar = CreateFrame("Frame", nil, previewSubBar)
+    previewTotemBar:SetSize(220, 24)
+    previewTotemBar:SetPoint("CENTER", previewSubBar, "CENTER", 0, 0)
+
+    local TOTEM_PREVIEW_DATA = {
+        { name = "Earth", fileID = 136098, path = "Interface\\Icons\\Spell_Nature_EarthBindTotem", time = "14m", r = 0.55, g = 0.35, b = 0.17 },
+        { name = "Fire",  fileID = 135824, path = "Interface\\Icons\\Spell_Fire_SearingTotem",     time = "1m 45s", r = 1.0, g = 0.27, b = 0.0 },
+        { name = "Water", fileID = 136053, path = "Interface\\Icons\\Spell_Nature_ManaRegenTotem", time = "42s", r = 0.0, g = 0.75, b = 1.0 },
+        { name = "Air",   fileID = 136018, path = "Interface\\Icons\\Spell_Nature_Windfury",       time = "28s", r = 0.13, g = 0.70, b = 0.67 },
+    }
+
+    local previewTotemBtns = {}
+    for i, tData in ipairs(TOTEM_PREVIEW_DATA) do
+        local btn = CreateFrame("Frame", nil, previewTotemBar, BackdropTemplateString)
+        btn:SetSize(50, 22)
+        btn:SetPoint("LEFT", previewTotemBar, "LEFT", (i - 1) * 55, 0)
+        ApplyWHITE8X8Backdrop(btn, 0.08, 0.09, 0.12, 0.9, tData.r, tData.g, tData.b, 0.6, 1)
+
+        local dot = btn:CreateTexture(nil, "OVERLAY")
+        dot:SetSize(6, 6)
+        dot:SetPoint("LEFT", btn, "LEFT", 5, 0)
+        dot:SetTexture("Interface\\Buttons\\WHITE8X8")
+        dot:SetVertexColor(tData.r, tData.g, tData.b, 1)
+
+        local icon = btn:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(14, 14)
+        icon:SetPoint("LEFT", dot, "RIGHT", 3, 0)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        if not pcall(icon.SetTexture, icon, tData.fileID) or not icon:GetTexture() then
+            icon:SetTexture(tData.path)
         end
-    )
-    moveLock:SetPoint("TOPLEFT", keyGroup, "BOTTOMLEFT", -24, -8)
 
-    -- Section 2: General & Healing Options
-    local generalTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    generalTitle:SetPoint("TOPLEFT", moveLock, "BOTTOMLEFT", 0, -16)
-    generalTitle:SetText("General & Healing Options:")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        lbl:SetPoint("LEFT", icon, "RIGHT", 3, 0)
+        lbl:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", 8, "OUTLINE")
+        lbl:SetText(tData.time)
+        lbl:SetTextColor(1, 1, 1, 1)
 
-    local classColorCb = CreateCheckbox(f, "Class-Colored Health Bar",
+        previewTotemBtns[i] = btn
+    end
+
+    -- Rogue / Druid Combo Points Preview (Real Blizzard Atlases)
+    local previewCPBar = CreateFrame("Frame", nil, previewSubBar)
+    previewCPBar:SetSize(100, 18)
+    previewCPBar:SetPoint("CENTER", previewSubBar, "CENTER", 0, 0)
+
+    local previewCPPips = {}
+    for i = 1, 5 do
+        local pip = CreateFrame("Frame", nil, previewCPBar)
+        pip:SetSize(16, 16)
+        pip:SetPoint("LEFT", previewCPBar, "LEFT", (i - 1) * 20, 0)
+
+        local bg = pip:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(pip)
+        local fill = pip:CreateTexture(nil, "OVERLAY")
+        fill:SetAllPoints(pip)
+
+        if FC.resolvedComboBgAtlas and FC.resolvedComboFillAtlas then
+            pcall(bg.SetAtlas, bg, FC.resolvedComboBgAtlas, false)
+            pcall(fill.SetAtlas, fill, FC.resolvedComboFillAtlas, false)
+        elseif C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("ComboPoints-ComboPoint") then
+            pcall(bg.SetAtlas, bg, "ComboPoints-PointBg", false)
+            pcall(fill.SetAtlas, fill, "ComboPoints-ComboPoint", false)
+        else
+            bg:SetTexture("Interface\\ComboFrame\\ComboPoint")
+            bg:SetTexCoord(0, 0.5, 0, 1)
+            fill:SetTexture("Interface\\ComboFrame\\ComboPoint")
+            fill:SetTexCoord(0.5, 1, 0, 1)
+        end
+
+        -- 3 Active filled pips, 2 empty pips
+        if i <= 3 then
+            fill:Show()
+        else
+            fill:Hide()
+        end
+        previewCPPips[i] = pip
+    end
+
+    -- Preview Update Engine
+    local function UpdateHUDPreview()
+        local isClassColor = ForeverClassesDB.classColorHealth and true or false
+        local showHeals = ForeverClassesDB.showIncomingHeals and true or false
+        local showTotems = ForeverClassesDB.showTotems and true or false
+        local showCP = ForeverClassesDB.showComboPoints and true or false
+        local textMode = ForeverClassesDB.textMode or "BOTH"
+        local slotCount = ForeverClassesDB.cooldownSlotCount
+        if slotCount == nil then
+            slotCount = (ForeverClassesDB.showCooldowns == false) and 0 or 7
+        end
+
+        -- 1. Slots Dock
+        if slotCount == 0 then
+            previewSlotsDock:Hide()
+        else
+            previewSlotsDock:Show()
+            for i = 1, 7 do
+                if i <= slotCount then
+                    previewSlotBtns[i]:Show()
+                else
+                    previewSlotBtns[i]:Hide()
+                end
+            end
+            local totalW = (slotCount * 20) + ((slotCount - 1) * 3)
+            previewSlotsDock:SetWidth(math.max(20, totalW))
+        end
+
+        -- 2. Health Bar Color
+        local classColor = RAID_CLASS_COLORS and RAID_CLASS_COLORS[playerClass]
+        if isClassColor and classColor then
+            previewHealthFill:SetVertexColor(classColor.r, classColor.g, classColor.b, 1.0)
+            previewHealFill:SetVertexColor(classColor.r, classColor.g, classColor.b, 0.45)
+        else
+            previewHealthFill:SetVertexColor(0.10, 0.75, 0.40, 1.0)
+            previewHealFill:SetVertexColor(0.30, 0.85, 0.55, 0.45)
+        end
+
+        -- 3. Upcoming Heals & Absorb Positioning
+        if showHeals then
+            previewHealFill:Show()
+            previewHealFill:ClearAllPoints()
+            previewHealFill:SetPoint("TOPLEFT", previewHealthFill, "TOPRIGHT", 0, 0)
+            previewHealFill:SetPoint("BOTTOMLEFT", previewHealthFill, "BOTTOMRIGHT", 0, 0)
+            previewHealFill:SetWidth(238 * 0.14)
+
+            previewAbsorbFill:ClearAllPoints()
+            previewAbsorbFill:SetPoint("TOPLEFT", previewHealFill, "TOPRIGHT", 0, 0)
+            previewAbsorbFill:SetPoint("BOTTOMLEFT", previewHealFill, "BOTTOMRIGHT", 0, 0)
+            previewAbsorbFill:SetWidth(238 * 0.08)
+        else
+            previewHealFill:Hide()
+            previewAbsorbFill:ClearAllPoints()
+            previewAbsorbFill:SetPoint("TOPLEFT", previewHealthFill, "TOPRIGHT", 0, 0)
+            previewAbsorbFill:SetPoint("BOTTOMLEFT", previewHealthFill, "BOTTOMRIGHT", 0, 0)
+            previewAbsorbFill:SetWidth(238 * 0.16)
+        end
+
+        -- 4. Status Text: Health Bar
+        if textMode == "BOTH" then
+            previewHealthText:SetText("2,145 / 2,750 (78%)")
+        elseif textMode == "NUMERIC" then
+            previewHealthText:SetText("2,145 / 2,750")
+        elseif textMode == "PERCENT" then
+            previewHealthText:SetText("78%")
+        elseif textMode == "SYNC" then
+            previewHealthText:SetText("2,145 (78%)")
+        else
+            previewHealthText:SetText("")
+        end
+
+        -- 5. Power Bar Color, Width & Text
+        if playerClass == "SHAMAN" then
+            previewPowerFill:SetVertexColor(0.15, 0.45, 0.95, 1.0)
+            previewPowerFill:SetWidth(238 * 0.85)
+            if textMode == "BOTH" then previewPowerText:SetText("3,320 / 3,900 (85%)")
+            elseif textMode == "NUMERIC" then previewPowerText:SetText("3,320 / 3,900")
+            elseif textMode == "PERCENT" then previewPowerText:SetText("85%")
+            elseif textMode == "SYNC" then previewPowerText:SetText("3,320 (85%)")
+            else previewPowerText:SetText("") end
+        elseif playerClass == "ROGUE" then
+            previewPowerFill:SetVertexColor(0.95, 0.85, 0.10, 1.0)
+            previewPowerFill:SetWidth(238 * 0.85)
+            if textMode == "BOTH" then previewPowerText:SetText("85 / 100 (85%)")
+            elseif textMode == "NUMERIC" then previewPowerText:SetText("85 / 100")
+            elseif textMode == "PERCENT" then previewPowerText:SetText("85%")
+            elseif textMode == "SYNC" then previewPowerText:SetText("85 (85%)")
+            else previewPowerText:SetText("") end
+        elseif playerClass == "WARRIOR" then
+            previewPowerFill:SetVertexColor(0.85, 0.15, 0.15, 1.0)
+            previewPowerFill:SetWidth(238 * 0.45)
+            if textMode == "BOTH" then previewPowerText:SetText("45 / 100 (45%)")
+            elseif textMode == "NUMERIC" then previewPowerText:SetText("45 / 100")
+            elseif textMode == "PERCENT" then previewPowerText:SetText("45%")
+            elseif textMode == "SYNC" then previewPowerText:SetText("45 (45%)")
+            else previewPowerText:SetText("") end
+        else
+            -- Universal Mana/Energy Fallback
+            previewPowerFill:SetVertexColor(0.15, 0.45, 0.95, 1.0)
+            previewPowerFill:SetWidth(238 * 0.80)
+            if textMode == "NONE" then previewPowerText:SetText("")
+            else previewPowerText:SetText("2,500 / 3,000 (83%)") end
+        end
+
+        -- 6. Class Sub-Bars
+        if playerClass == "SHAMAN" and showTotems then
+            previewTotemBar:Show()
+            previewCPBar:Hide()
+        elseif (playerClass == "ROGUE" or playerClass == "DRUID") and showCP then
+            previewCPBar:Show()
+            previewTotemBar:Hide()
+        else
+            previewTotemBar:Hide()
+            previewCPBar:Hide()
+        end
+    end
+
+    -- ========================================================================
+    -- BOTTOM SECTION: 2-Column Dashboard (Sidebar Tabs + Content Area)
+    -- ========================================================================
+
+    -- Left Sidebar
+    local sidebar = CreateFrame("Frame", nil, f, BackdropTemplateString)
+    sidebar:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -192)
+    sidebar:SetSize(175, 380)
+    ApplyWHITE8X8Backdrop(sidebar, 0.040, 0.045, 0.055, 0.8, 0.12, 0.14, 0.18, 0.7, 1)
+
+    local sidebarTitle = sidebar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    sidebarTitle:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 12, -10)
+    sidebarTitle:SetText("|cff666666CONFIGURATION|r")
+
+    -- Right Content Area Container
+    local contentArea = CreateFrame("Frame", nil, f)
+    contentArea:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 10, 0)
+    contentArea:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 48)
+
+    local contentPanels = {}
+    local tabButtons = {}
+    local currentTab = "display"
+
+    -- Reusable Widget Constructors
+    local function CreateCard(parent, height, yOffset)
+        local card = CreateFrame("Frame", nil, parent, BackdropTemplateString)
+        card:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, yOffset or 0)
+        card:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yOffset or 0)
+        card:SetHeight(height)
+        ApplyWHITE8X8Backdrop(card, 0.08, 0.09, 0.12, 0.95, 0.18, 0.20, 0.26, 0.8, 1)
+        return card
+    end
+
+    local function CreateToggleSwitchCard(parent, titleText, descText, yOffset, getFunc, setFunc, settingKey, onChange)
+        local card = CreateCard(parent, 56, yOffset)
+
+        local sw = CreateFrame("Button", nil, card, BackdropTemplateString)
+        sw:SetSize(38, 20)
+        sw:SetPoint("RIGHT", card, "RIGHT", -12, 0)
+        ApplyWHITE8X8Backdrop(sw, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
+
+        local thumb = sw:CreateTexture(nil, "OVERLAY")
+        thumb:SetSize(14, 14)
+        thumb:SetTexture("Interface\\Buttons\\WHITE8X8")
+        thumb:SetPoint("LEFT", sw, "LEFT", 3, 0)
+        sw.thumb = thumb
+
+        local title = card:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        title:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -9)
+        title:SetPoint("TOPRIGHT", card, "TOPRIGHT", -60, -9)
+        title:SetJustifyH("LEFT")
+        title:SetText(titleText)
+
+        local desc = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+        desc:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -3)
+        desc:SetWordWrap(true)
+        desc:SetJustifyH("LEFT")
+        desc:SetText(descText)
+
+        sw.UpdateValue = function(self)
+            local val = getFunc() and true or false
+            if val then
+                self:SetBackdropColor(0.0, 0.60, 0.85, 1.0)
+                self:SetBackdropBorderColor(0.0, 0.80, 1.0, 1.0)
+                thumb:ClearAllPoints()
+                thumb:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+                thumb:SetVertexColor(1, 1, 1, 1)
+            else
+                self:SetBackdropColor(0.16, 0.18, 0.24, 1.0)
+                self:SetBackdropBorderColor(0.26, 0.30, 0.38, 1.0)
+                thumb:ClearAllPoints()
+                thumb:SetPoint("LEFT", self, "LEFT", 3, 0)
+                thumb:SetVertexColor(0.65, 0.68, 0.75, 1)
+            end
+        end
+
+        sw:SetScript("OnClick", function(self)
+            local newVal = not (getFunc() and true or false)
+            PlaySound(newVal and (SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856) or (SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857))
+            setFunc(newVal)
+            if settingKey and FC.SaveCharSetting then
+                FC:SaveCharSetting(settingKey, newVal)
+            end
+            self:UpdateValue()
+            UpdateHUDPreview()
+            if onChange then onChange(newVal) end
+        end)
+
+        card.sw = sw
+        sw:UpdateValue()
+        return card
+    end
+
+    local function CreateSliderCard(parent, titleText, descText, yOffset, minVal, maxVal, step, getFunc, setFunc, formatFunc, settingKey, onChange)
+        local card = CreateCard(parent, 68, yOffset)
+
+        local readout = card:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        readout:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, -8)
+
+        local title = card:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        title:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -8)
+        title:SetPoint("TOPRIGHT", readout, "TOPLEFT", -8, 0)
+        title:SetJustifyH("LEFT")
+        title:SetText(titleText)
+
+        local desc = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+        desc:SetPoint("TOPRIGHT", card, "TOPRIGHT", -12, -22)
+        desc:SetWordWrap(true)
+        desc:SetJustifyH("LEFT")
+        desc:SetText(descText)
+
+        local sliderName = "ForeverClassesCfgSlider_" .. tostring(settingKey or math.random(1000, 9999))
+        local slider = CreateFrame("Slider", sliderName, card, "OptionsSliderTemplate")
+        slider:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 12, 8)
+        slider:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -12, 8)
+        slider:SetHeight(14)
+        slider:SetMinMaxValues(minVal, maxVal)
+        slider:SetValueStep(step or 1)
+        slider:SetObeyStepOnDrag(true)
+
+        local low = _G[sliderName .. "Low"]
+        local high = _G[sliderName .. "High"]
+        local text = _G[sliderName .. "Text"]
+        if low then low:Hide() end
+        if high then high:Hide() end
+        if text then text:Hide() end
+
+        local isUpdating = false
+        card.UpdateValue = function(self)
+            isUpdating = true
+            local cur = getFunc() or minVal
+            slider:SetValue(cur)
+            if formatFunc then
+                readout:SetText(formatFunc(cur))
+            else
+                readout:SetText(tostring(cur))
+            end
+            isUpdating = false
+        end
+
+        slider:SetScript("OnValueChanged", function(self, val)
+            val = math.floor(val + 0.5)
+            if formatFunc then
+                readout:SetText(formatFunc(val))
+            else
+                readout:SetText(tostring(val))
+            end
+            if not isUpdating then
+                setFunc(val)
+                if settingKey and FC.SaveCharSetting then
+                    FC:SaveCharSetting(settingKey, val)
+                end
+                UpdateHUDPreview()
+                if onChange then onChange(val) end
+            end
+        end)
+
+        card.slider = slider
+        card:UpdateValue()
+        return card
+    end
+
+    -- Tab Switch Engine
+    local function SelectTab(tabId)
+        if tabId == "class" and not hasClassSupport then
+            return
+        end
+
+        currentTab = tabId
+        PlaySound(SOUNDKIT.IG_MAINOPTION_TAB or 841)
+
+        for id, panel in pairs(contentPanels) do
+            if id == tabId then
+                panel:Show()
+            else
+                panel:Hide()
+            end
+        end
+
+        for id, btn in pairs(tabButtons) do
+            if id == tabId then
+                btn:SetBackdropColor(0.10, 0.12, 0.16, 0.95)
+                btn:SetBackdropBorderColor(0.78, 0.61, 0.24, 0.6)
+                btn.label:SetTextColor(0.0, 0.80, 1.0, 1.0)
+                if btn.icon then btn.icon:SetVertexColor(1, 1, 1, 1) end
+            else
+                local isDis = (id == "class" and not hasClassSupport)
+                if isDis then
+                    btn:SetBackdropColor(0.05, 0.05, 0.06, 0.4)
+                    btn:SetBackdropBorderColor(0.12, 0.14, 0.18, 0.4)
+                    btn.label:SetTextColor(0.35, 0.38, 0.45, 1.0)
+                    if btn.icon then btn.icon:SetVertexColor(0.35, 0.38, 0.45, 0.6) end
+                else
+                    btn:SetBackdropColor(0.05, 0.05, 0.06, 0.7)
+                    btn:SetBackdropBorderColor(0.12, 0.14, 0.18, 0.6)
+                    btn.label:SetTextColor(0.65, 0.68, 0.75, 1.0)
+                    if btn.icon then btn.icon:SetVertexColor(0.8, 0.8, 0.8, 1) end
+                end
+            end
+        end
+    end
+
+    -- Create 5 Sidebar Tabs (No Emojis - Real Blizzard Textures)
+    local TAB_DEFS = {
+        { id = "display",   label = "HUD & Appearance",     icon = "Interface\\Icons\\INV_Misc_Eye_01" },
+        { id = "abilities", label = "Abilities & Cooldowns", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry" },
+        { id = "class",     label = "Class Support",        icon = "Interface\\Icons\\INV_Misc_Book_09" },
+        { id = "alerts",    label = "Alerts & Debuffs",     icon = "Interface\\Icons\\Spell_Shadow_Skull" },
+        { id = "position",  label = "Position & Movement",  icon = "Interface\\Icons\\Ability_Hunter_Pathfinding" },
+    }
+
+    for i, tDef in ipairs(TAB_DEFS) do
+        local btn = CreateFrame("Button", nil, sidebar, BackdropTemplateString)
+        btn:SetSize(155, 36)
+        btn:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 10, -28 - ((i - 1) * 42))
+        btn.tabId = tDef.id
+
+        ApplyWHITE8X8Backdrop(btn, 0.05, 0.05, 0.06, 0.7, 0.12, 0.14, 0.18, 0.6, 1)
+
+        local icon = btn:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(18, 18)
+        icon:SetPoint("LEFT", btn, "LEFT", 8, 0)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+        if tDef.id == "class" and coords then
+            icon:SetTexture("Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES")
+            icon:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+        else
+            icon:SetTexture(tDef.icon)
+        end
+        btn.icon = icon
+
+        local label = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        label:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+        label:SetText(tDef.label)
+        btn.label = label
+
+        -- Class Support Tab: Handle Unsupported Classes
+        if tDef.id == "class" and not hasClassSupport then
+            local badge = btn:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+            badge:SetPoint("RIGHT", btn, "RIGHT", -6, 0)
+            badge:SetText("|cff555555[N/A]|r")
+            btn.badge = badge
+
+            btn:SetAlpha(0.4)
+            btn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine("|cffffd100Class Support|r", 1, 1, 1)
+                GameTooltip:AddLine("|cffffaa00Your class doesn't have special support yet|r", 1, 0.8, 0.2)
+                GameTooltip:AddLine("Your class utilizes the core universal ForeverClasses HUD engine without requiring dedicated sub-bars.", 0.7, 0.7, 0.7, true)
+                GameTooltip:Show()
+            end)
+            btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            btn:SetScript("OnClick", function()
+                PlaySound(SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857)
+            end)
+        else
+            btn:SetScript("OnEnter", function(self)
+                if self.tabId ~= currentTab then
+                    self:SetBackdropBorderColor(0.35, 0.40, 0.50, 0.8)
+                    self.label:SetTextColor(1, 1, 1, 1)
+                end
+            end)
+            btn:SetScript("OnLeave", function(self)
+                if self.tabId ~= currentTab then
+                    self:SetBackdropBorderColor(0.12, 0.14, 0.18, 0.6)
+                    self.label:SetTextColor(0.65, 0.68, 0.75, 1.0)
+                end
+            end)
+            btn:SetScript("OnClick", function(self)
+                SelectTab(self.tabId)
+            end)
+        end
+
+        tabButtons[tDef.id] = btn
+    end
+
+    -- ========================================================================
+    -- PANEL 1: HUD & Appearance
+    -- ========================================================================
+    local panelDisplay = CreateFrame("Frame", nil, contentArea)
+    panelDisplay:SetAllPoints(contentArea)
+    contentPanels["display"] = panelDisplay
+
+    local titleDisplay = panelDisplay:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
+    titleDisplay:SetPoint("TOPLEFT", panelDisplay, "TOPLEFT", 0, -2)
+    titleDisplay:SetText("HUD & Appearance")
+
+    local subDisplay = panelDisplay:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    subDisplay:SetPoint("TOPLEFT", titleDisplay, "BOTTOMLEFT", 0, -2)
+    subDisplay:SetPoint("RIGHT", panelDisplay, "RIGHT", -12, 0)
+    subDisplay:SetWordWrap(true)
+    subDisplay:SetJustifyH("LEFT")
+    subDisplay:SetText("Control visual colors, heal prediction, text formatting, and resting opacity.")
+
+    -- Option 1: Class-Colored Health Bar
+    local cardClassColor = CreateToggleSwitchCard(panelDisplay, "Class-Colored Health Bar",
+        "Tint health bar with your active class color instead of Emerald Green.", -40,
         function() return ForeverClassesDB.classColorHealth end,
         function(val)
             ForeverClassesDB.classColorHealth = val
@@ -590,9 +1178,10 @@ function FC:CreateConfigWindow()
         end,
         "classColorHealth"
     )
-    classColorCb:SetPoint("TOPLEFT", generalTitle, "BOTTOMLEFT", 0, -6)
 
-    local healCb = CreateCheckbox(f, "Show Upcoming Heals (Heal Prediction)",
+    -- Option 2: Upcoming Heals Prediction
+    local cardHeals = CreateToggleSwitchCard(panelDisplay, "Upcoming Heals Prediction",
+        "Visualizes incoming direct and HoT heals in real-time before they land.", -102,
         function() return ForeverClassesDB.showIncomingHeals end,
         function(val)
             ForeverClassesDB.showIncomingHeals = val
@@ -600,77 +1189,446 @@ function FC:CreateConfigWindow()
         end,
         "showIncomingHeals"
     )
-    healCb:SetPoint("TOPLEFT", classColorCb, "BOTTOMLEFT", 0, -4)
 
-    local absorbCb = CreateCheckbox(f, "Show Shield / Absorb Bar",
-        function() return ForeverClassesDB.showAbsorbs ~= false end,
-        function(val)
-            ForeverClassesDB.showAbsorbs = val
-            if FC.UpdateHealth then FC:UpdateHealth() end
-        end,
-        "showAbsorbs"
-    )
-    absorbCb:SetPoint("TOPLEFT", healCb, "BOTTOMLEFT", 0, -4)
+    -- Option 3: Status Text Display Mode (Segmented Button Group)
+    local cardTextMode = CreateCard(panelDisplay, 62, -164)
 
-    local _, pClass = UnitClass("player")
-    local isComboClass = (pClass == "ROGUE" or pClass == "DRUID")
-    local isShaman = (pClass == "SHAMAN")
+    local txtTitle = cardTextMode:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    txtTitle:SetPoint("TOPLEFT", cardTextMode, "TOPLEFT", 12, -8)
+    txtTitle:SetPoint("RIGHT", cardTextMode, "RIGHT", -12, 0)
+    txtTitle:SetJustifyH("LEFT")
+    txtTitle:SetText("Status Text Display Mode")
 
-    local cpCb = CreateCheckbox(f, "Show Combo Points",
-        function() return ForeverClassesDB.showComboPoints end,
-        function(val)
-            ForeverClassesDB.showComboPoints = val
-            if FC.UpdateComboPoints then FC:UpdateComboPoints() end
-        end,
-        "showComboPoints"
-    )
-    if isComboClass then
-        cpCb:SetPoint("TOPLEFT", absorbCb, "BOTTOMLEFT", 0, -4)
-        cpCb:Show()
-    else
-        cpCb:Hide()
+    local textModes = {
+        { id = "BOTH",    label = "Both" },
+        { id = "NUMERIC", label = "Numeric" },
+        { id = "PERCENT", label = "Percent" },
+        { id = "SYNC",    label = "Sync" },
+        { id = "NONE",    label = "Hide" },
+    }
+    local textModeBtns = {}
+    for i, tm in ipairs(textModes) do
+        local btn = CreateFrame("Button", nil, cardTextMode, BackdropTemplateString)
+        btn:SetSize(76, 22)
+        btn:SetPoint("TOPLEFT", cardTextMode, "TOPLEFT", 12 + ((i - 1) * 81), -30)
+        btn.tmId = tm.id
+        ApplyWHITE8X8Backdrop(btn, 0.05, 0.06, 0.08, 0.8, 0.15, 0.17, 0.22, 0.8, 1)
+
+        local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        btnText:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        btnText:SetText(tm.label)
+        btn.btnText = btnText
+
+        btn:SetScript("OnClick", function()
+            PlaySound(SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856)
+            ForeverClassesDB.textMode = tm.id
+            if FC.SaveCharSetting then FC:SaveCharSetting("textMode", tm.id) end
+            if FC.ApplyConfig then FC:ApplyConfig() end
+            cardTextMode:UpdateValue()
+            UpdateHUDPreview()
+        end)
+        textModeBtns[tm.id] = btn
     end
 
-    local totemCb = CreateCheckbox(f, "Show Totem Bar (Shaman)",
-        function() return ForeverClassesDB.showTotems end,
-        function(val)
-            ForeverClassesDB.showTotems = val
-            if FC.UpdateTotems then FC:UpdateTotems() end
-        end,
-        "showTotems"
-    )
-    if isShaman then
-        totemCb:SetPoint("TOPLEFT", absorbCb, "BOTTOMLEFT", 0, -4)
-        totemCb:Show()
-    else
-        totemCb:Hide()
-    end
-
-    local lowHealthCb = CreateCheckbox(f, string.format("Low Health Warning Flash (<= %d%% HP)", ForeverClassesDB.lowHealthThreshold or 33),
-        function() return ForeverClassesDB.lowHealthWarning end,
-        function(val)
-            ForeverClassesDB.lowHealthWarning = val
-            if FC.UpdateHealth then FC:UpdateHealth() end
-        end,
-        "lowHealthWarning"
-    )
-    if isComboClass then
-        lowHealthCb:SetPoint("TOPLEFT", cpCb, "BOTTOMLEFT", 0, -4)
-    elseif isShaman then
-        lowHealthCb:SetPoint("TOPLEFT", totemCb, "BOTTOMLEFT", 0, -4)
-    else
-        lowHealthCb:SetPoint("TOPLEFT", absorbCb, "BOTTOMLEFT", 0, -4)
-    end
-    local origLowHealthUpdate = lowHealthCb.UpdateValue
-    lowHealthCb.UpdateValue = function(self)
-        if origLowHealthUpdate then origLowHealthUpdate(self) end
-        local t = ForeverClassesDB.lowHealthThreshold or 33
-        if self.text then
-            self.text:SetText(string.format("Low Health Warning Flash (<= %d%% HP)", t))
+    cardTextMode.UpdateValue = function()
+        local cur = ForeverClassesDB.textMode or "BOTH"
+        for id, btn in pairs(textModeBtns) do
+            if id == cur then
+                btn:SetBackdropColor(0.0, 0.50, 0.70, 0.35)
+                btn:SetBackdropBorderColor(0.0, 0.80, 1.0, 0.9)
+                btn.btnText:SetTextColor(0.0, 0.80, 1.0, 1.0)
+            else
+                btn:SetBackdropColor(0.05, 0.06, 0.08, 0.8)
+                btn:SetBackdropBorderColor(0.15, 0.17, 0.22, 0.8)
+                btn.btnText:SetTextColor(0.65, 0.68, 0.75, 1.0)
+            end
         end
     end
+    cardTextMode:UpdateValue()
 
-    local debuffCb = CreateCheckbox(f, "Show Harmful Debuffs (Icons on Right of Bar)",
+    -- Option 4: Out-of-Combat Auto Fade (Slider 10-80%)
+    local cardFade = CreateSliderCard(panelDisplay, "Out-of-Combat Auto Fade",
+        "Dims HUD when at 100% health & mana with no target.", -232,
+        10, 80, 5,
+        function() return math.floor(((ForeverClassesDB.autoFadeAlpha) or 0.35) * 100) end,
+        function(val)
+            ForeverClassesDB.autoFadeAlpha = val / 100
+            ForeverClassesDB.autoFade = true
+            if FC.RequestFadeCheck then FC:RequestFadeCheck() end
+        end,
+        function(val) return string.format("|cff00ccff%d%%|r", val) end,
+        "autoFadeAlpha"
+    )
+
+    -- Option 5: Permanent Core Shield Notice
+    local cardShieldNotice = CreateCard(panelDisplay, 72, -306)
+    local shieldNoticeTitle = cardShieldNotice:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    shieldNoticeTitle:SetPoint("TOPLEFT", cardShieldNotice, "TOPLEFT", 12, -8)
+    shieldNoticeTitle:SetText("|cffddddddNative Damage Absorption & Overshield Engine|r")
+
+    local shieldNoticeBadge = cardShieldNotice:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    shieldNoticeBadge:SetPoint("TOPRIGHT", cardShieldNotice, "TOPRIGHT", -12, -8)
+    shieldNoticeBadge:SetText("|cff00ff88Native Core|r")
+
+    shieldNoticeTitle:SetPoint("RIGHT", shieldNoticeBadge, "LEFT", -8, 0)
+    shieldNoticeTitle:SetJustifyH("LEFT")
+
+    local shieldNoticeDesc = cardShieldNotice:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    shieldNoticeDesc:SetPoint("TOPLEFT", shieldNoticeTitle, "BOTTOMLEFT", 0, -3)
+    shieldNoticeDesc:SetPoint("TOPRIGHT", cardShieldNotice, "TOPRIGHT", -12, -23)
+    shieldNoticeDesc:SetWordWrap(true)
+    shieldNoticeDesc:SetJustifyH("LEFT")
+    shieldNoticeDesc:SetText("Real-time shields (PW:S, Ice Barrier, Mana Shield) and dynamic overshield cyan glow are permanent core HUD features. Non-toggleable to ensure complete combat awareness.")
+
+    -- ========================================================================
+    -- PANEL 2: Abilities & Cooldowns
+    -- ========================================================================
+    local panelAbilities = CreateFrame("Frame", nil, contentArea)
+    panelAbilities:SetAllPoints(contentArea)
+    panelAbilities:Hide()
+    contentPanels["abilities"] = panelAbilities
+
+    local titleAbilities = panelAbilities:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
+    titleAbilities:SetPoint("TOPLEFT", panelAbilities, "TOPLEFT", 0, -2)
+    titleAbilities:SetText("Ability & Cooldown Dock")
+
+    local subAbilities = panelAbilities:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    subAbilities:SetPoint("TOPLEFT", titleAbilities, "BOTTOMLEFT", 0, -2)
+    subAbilities:SetPoint("RIGHT", panelAbilities, "RIGHT", -12, 0)
+    subAbilities:SetWordWrap(true)
+    subAbilities:SetJustifyH("LEFT")
+    subAbilities:SetText("Configure ability dock slots (0 to 7) and flash pulse effects.")
+
+    -- Option 1: Active Ability Slots Selector (0 to 7)
+    local cardSlots = CreateCard(panelAbilities, 96, -40)
+
+    local slotsReadout = cardSlots:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    slotsReadout:SetPoint("TOPRIGHT", cardSlots, "TOPRIGHT", -12, -8)
+
+    local slotsTitle = cardSlots:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    slotsTitle:SetPoint("TOPLEFT", cardSlots, "TOPLEFT", 12, -8)
+    slotsTitle:SetPoint("TOPRIGHT", slotsReadout, "TOPLEFT", -8, 0)
+    slotsTitle:SetJustifyH("LEFT")
+    slotsTitle:SetText("Active Ability Slots")
+
+    local slotsDesc = cardSlots:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    slotsDesc:SetPoint("TOPLEFT", slotsTitle, "BOTTOMLEFT", 0, -2)
+    slotsDesc:SetPoint("TOPRIGHT", cardSlots, "TOPRIGHT", -12, -22)
+    slotsDesc:SetWordWrap(true)
+    slotsDesc:SetJustifyH("LEFT")
+    slotsDesc:SetText("Number of spell/ability buttons docked directly above the health bar.")
+
+    local slotBtns = {}
+    local slotConfig = {
+        { num = 0, label = "0 Off", w = 48 },
+        { num = 1, label = "1",     w = 34 },
+        { num = 2, label = "2",     w = 34 },
+        { num = 3, label = "3",     w = 34 },
+        { num = 4, label = "4",     w = 34 },
+        { num = 5, label = "5",     w = 34 },
+        { num = 6, label = "6",     w = 34 },
+        { num = 7, label = "7",     w = 34 },
+    }
+    local curX = 12
+    for _, sc in ipairs(slotConfig) do
+        local btn = CreateFrame("Button", nil, cardSlots, BackdropTemplateString)
+        btn:SetSize(sc.w, 22)
+        btn:SetPoint("TOPLEFT", cardSlots, "TOPLEFT", curX, -38)
+        btn.slotNum = sc.num
+        ApplyWHITE8X8Backdrop(btn, 0.05, 0.06, 0.08, 0.8, 0.15, 0.17, 0.22, 0.8, 1)
+
+        local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        btnText:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        btnText:SetText(sc.label)
+        btn.btnText = btnText
+
+        btn:SetScript("OnClick", function()
+            PlaySound(SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856)
+            FC:SetCooldownSlotCount(sc.num)
+            cardSlots:UpdateValue()
+            UpdateHUDPreview()
+        end)
+        slotBtns[sc.num] = btn
+        curX = curX + sc.w + 5
+    end
+
+    local slotsFootnote = cardSlots:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    slotsFootnote:SetPoint("TOPLEFT", cardSlots, "TOPLEFT", 12, -68)
+    slotsFootnote:SetPoint("TOPRIGHT", cardSlots, "TOPRIGHT", -12, -68)
+    slotsFootnote:SetWordWrap(true)
+    slotsFootnote:SetJustifyH("LEFT")
+    slotsFootnote:SetText("ForeverClasses supports exactly up to 7 slots spanning the 240px unit frame width.")
+
+    cardSlots.UpdateValue = function()
+        local cur = FC:GetCooldownSlotCount()
+        for num, btn in pairs(slotBtns) do
+            if num == cur then
+                btn:SetBackdropColor(0.0, 0.50, 0.70, 0.35)
+                btn:SetBackdropBorderColor(0.0, 0.80, 1.0, 0.9)
+                btn.btnText:SetTextColor(0.0, 0.80, 1.0, 1.0)
+            else
+                btn:SetBackdropColor(0.05, 0.06, 0.08, 0.8)
+                btn:SetBackdropBorderColor(0.15, 0.17, 0.22, 0.8)
+                btn.btnText:SetTextColor(0.65, 0.68, 0.75, 1.0)
+            end
+        end
+        if cur == 0 then
+            slotsReadout:SetText("|cffff44440 Off (Disabled)|r")
+        else
+            slotsReadout:SetText(string.format("|cff00ff88%d Active|r", cur))
+        end
+    end
+    cardSlots:UpdateValue()
+
+    -- Option 2: Cooldown Ready Pulse
+    local cardPulse = CreateToggleSwitchCard(panelAbilities, "Cooldown Ready Pulse",
+        "Flash high-contrast starburst animation when an ability comes off cooldown.", -142,
+        function() return ForeverClassesDB.cooldownPulse ~= false end,
+        function(val) ForeverClassesDB.cooldownPulse = val end,
+        "cooldownPulse"
+    )
+
+    -- Option 3: Built-in Active Buff Overlay Notice
+    local cardBuffNotice = CreateCard(panelAbilities, 88, -204)
+    local buffIcon = cardBuffNotice:CreateTexture(nil, "ARTWORK")
+    buffIcon:SetSize(22, 22)
+    buffIcon:SetPoint("TOPLEFT", cardBuffNotice, "TOPLEFT", 12, -12)
+    buffIcon:SetTexture("Interface\\Icons\\Spell_Holy_MagicalSentry")
+    buffIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local buffNoticeText = cardBuffNotice:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    buffNoticeText:SetPoint("TOPLEFT", buffIcon, "TOPRIGHT", 10, 2)
+    buffNoticeText:SetPoint("TOPRIGHT", cardBuffNotice, "TOPRIGHT", -12, -10)
+    buffNoticeText:SetWordWrap(true)
+    buffNoticeText:SetJustifyH("LEFT")
+    buffNoticeText:SetText("|cffffd100Built-in Active Buff Overlay:|r When a tracked ability grants a self-buff (e.g. |cffffffffSprint, Blade Flurry, Ice Barrier, Lightning Shield|r), its button automatically illuminates with a radiant golden border and real-time countdown timer without requiring separate configuration.")
+
+    -- ========================================================================
+    -- PANEL 3: Class Support (Context-Sensitive to Active Class)
+    -- ========================================================================
+    local panelClass = CreateFrame("Frame", nil, contentArea)
+    panelClass:SetAllPoints(contentArea)
+    panelClass:Hide()
+    contentPanels["class"] = panelClass
+
+    local titleClass = panelClass:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
+    titleClass:SetPoint("TOPLEFT", panelClass, "TOPLEFT", 0, -2)
+    if playerClass == "SHAMAN" then
+        titleClass:SetText("Shaman Support Module")
+    elseif playerClass == "ROGUE" or playerClass == "DRUID" then
+        titleClass:SetText("Rogue & Feral Support Module")
+    else
+        titleClass:SetText("Class Support Module")
+    end
+
+    local subClass = panelClass:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    subClass:SetPoint("TOPLEFT", titleClass, "BOTTOMLEFT", 0, -2)
+    subClass:SetPoint("RIGHT", panelClass, "RIGHT", -12, 0)
+    subClass:SetWordWrap(true)
+    subClass:SetJustifyH("LEFT")
+    subClass:SetText("Context-sensitive mechanics and sub-bars tailored specifically for your active class.")
+
+    local cardClassEngine = nil
+    if playerClass == "SHAMAN" then
+        cardClassEngine = CreateCard(panelClass, 96, -40)
+        cardClassEngine:SetBackdropBorderColor(0.0, 0.44, 0.87, 0.6)
+
+        local ceHeader = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        ceHeader:SetPoint("TOPLEFT", cardClassEngine, "TOPLEFT", 12, -10)
+        ceHeader:SetText("|cff0070DESHAMAN SUPPORT ENGINE|r")
+
+        local ceBadge = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        ceBadge:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -12, -10)
+        ceBadge:SetText("|cff00ccffActive Class|r")
+
+        local ceDivider = cardClassEngine:CreateTexture(nil, "ARTWORK")
+        ceDivider:SetHeight(1)
+        ceDivider:SetPoint("TOPLEFT", cardClassEngine, "TOPLEFT", 12, -26)
+        ceDivider:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -12, -26)
+        ceDivider:SetTexture("Interface\\Buttons\\WHITE8X8")
+        ceDivider:SetVertexColor(0.2, 0.24, 0.32, 0.8)
+
+        local swTotem = CreateFrame("Button", nil, cardClassEngine, BackdropTemplateString)
+        swTotem:SetSize(38, 20)
+        swTotem:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -12, -34)
+        ApplyWHITE8X8Backdrop(swTotem, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
+
+        local thumbT = swTotem:CreateTexture(nil, "OVERLAY")
+        thumbT:SetSize(14, 14)
+        thumbT:SetTexture("Interface\\Buttons\\WHITE8X8")
+        swTotem.thumb = thumbT
+
+        local tTitle = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        tTitle:SetPoint("TOPLEFT", ceDivider, "BOTTOMLEFT", 0, -10)
+        tTitle:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -60, -37)
+        tTitle:SetJustifyH("LEFT")
+        tTitle:SetText("Shaman Totem Bar")
+
+        local tDesc = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        tDesc:SetPoint("TOPLEFT", tTitle, "BOTTOMLEFT", 0, -3)
+        tDesc:SetPoint("TOPRIGHT", tTitle, "BOTTOMRIGHT", 0, -3)
+        tDesc:SetWordWrap(true)
+        tDesc:SetJustifyH("LEFT")
+        tDesc:SetText("Docks 4 elemental slots (Earth, Fire, Water, Air) below the HUD with live expiration timers.")
+
+        swTotem.UpdateValue = function(self)
+            local val = ForeverClassesDB.showTotems and true or false
+            if val then
+                self:SetBackdropColor(0.0, 0.44, 0.87, 1.0)
+                self:SetBackdropBorderColor(0.0, 0.70, 1.0, 1.0)
+                thumbT:ClearAllPoints()
+                thumbT:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+                thumbT:SetVertexColor(1, 1, 1, 1)
+            else
+                self:SetBackdropColor(0.16, 0.18, 0.24, 1.0)
+                self:SetBackdropBorderColor(0.26, 0.30, 0.38, 1.0)
+                thumbT:ClearAllPoints()
+                thumbT:SetPoint("LEFT", self, "LEFT", 3, 0)
+                thumbT:SetVertexColor(0.65, 0.68, 0.75, 1)
+            end
+        end
+
+        swTotem:SetScript("OnClick", function(self)
+            local newVal = not (ForeverClassesDB.showTotems and true or false)
+            PlaySound(newVal and (SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856) or (SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857))
+            ForeverClassesDB.showTotems = newVal
+            if FC.SaveCharSetting then FC:SaveCharSetting("showTotems", newVal) end
+            if FC.UpdateTotems then FC:UpdateTotems() end
+            self:UpdateValue()
+            UpdateHUDPreview()
+        end)
+        cardClassEngine.sw = swTotem
+        swTotem:UpdateValue()
+
+    elseif playerClass == "ROGUE" or playerClass == "DRUID" then
+        cardClassEngine = CreateCard(panelClass, 96, -40)
+        cardClassEngine:SetBackdropBorderColor(1.0, 0.96, 0.41, 0.6)
+
+        local ceHeader = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        ceHeader:SetPoint("TOPLEFT", cardClassEngine, "TOPLEFT", 12, -10)
+        ceHeader:SetText("|cfffff569ROGUE & FERAL SUPPORT ENGINE|r")
+
+        local ceBadge = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        ceBadge:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -12, -10)
+        ceBadge:SetText("|cfffff569Active Class|r")
+
+        local ceDivider = cardClassEngine:CreateTexture(nil, "ARTWORK")
+        ceDivider:SetHeight(1)
+        ceDivider:SetPoint("TOPLEFT", cardClassEngine, "TOPLEFT", 12, -26)
+        ceDivider:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -12, -26)
+        ceDivider:SetTexture("Interface\\Buttons\\WHITE8X8")
+        ceDivider:SetVertexColor(0.2, 0.24, 0.32, 0.8)
+
+        local swCP = CreateFrame("Button", nil, cardClassEngine, BackdropTemplateString)
+        swCP:SetSize(38, 20)
+        swCP:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -12, -34)
+        ApplyWHITE8X8Backdrop(swCP, 0.16, 0.18, 0.24, 1.0, 0.26, 0.30, 0.38, 1.0, 1)
+
+        local thumbCP = swCP:CreateTexture(nil, "OVERLAY")
+        thumbCP:SetSize(14, 14)
+        thumbCP:SetTexture("Interface\\Buttons\\WHITE8X8")
+        swCP.thumb = thumbCP
+
+        local cTitle = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        cTitle:SetPoint("TOPLEFT", ceDivider, "BOTTOMLEFT", 0, -10)
+        cTitle:SetPoint("TOPRIGHT", cardClassEngine, "TOPRIGHT", -60, -37)
+        cTitle:SetJustifyH("LEFT")
+        cTitle:SetText("Combo Points Bar")
+
+        local cDesc = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        cDesc:SetPoint("TOPLEFT", cTitle, "BOTTOMLEFT", 0, -3)
+        cDesc:SetPoint("TOPRIGHT", cTitle, "BOTTOMRIGHT", 0, -3)
+        cDesc:SetWordWrap(true)
+        cDesc:SetJustifyH("LEFT")
+        cDesc:SetText("Renders 5 high-contrast combo point orbs directly beneath the power bar during combat.")
+
+        swCP.UpdateValue = function(self)
+            local val = ForeverClassesDB.showComboPoints and true or false
+            if val then
+                self:SetBackdropColor(0.85, 0.75, 0.10, 1.0)
+                self:SetBackdropBorderColor(1.0, 0.90, 0.20, 1.0)
+                thumbCP:ClearAllPoints()
+                thumbCP:SetPoint("RIGHT", self, "RIGHT", -3, 0)
+                thumbCP:SetVertexColor(1, 1, 1, 1)
+            else
+                self:SetBackdropColor(0.16, 0.18, 0.24, 1.0)
+                self:SetBackdropBorderColor(0.26, 0.30, 0.38, 1.0)
+                thumbCP:ClearAllPoints()
+                thumbCP:SetPoint("LEFT", self, "LEFT", 3, 0)
+                thumbCP:SetVertexColor(0.65, 0.68, 0.75, 1)
+            end
+        end
+
+        swCP:SetScript("OnClick", function(self)
+            local newVal = not (ForeverClassesDB.showComboPoints and true or false)
+            PlaySound(newVal and (SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856) or (SOUNDKIT.IG_MAINOPTION_CHECKBOX_OFF or 857))
+            ForeverClassesDB.showComboPoints = newVal
+            if FC.SaveCharSetting then FC:SaveCharSetting("showComboPoints", newVal) end
+            if FC.UpdateComboPoints then FC:UpdateComboPoints() end
+            self:UpdateValue()
+            UpdateHUDPreview()
+        end)
+        cardClassEngine.sw = swCP
+        swCP:UpdateValue()
+    else
+        -- Unsupported Class Message Card
+        cardClassEngine = CreateCard(panelClass, 120, -40)
+        local unIcon = cardClassEngine:CreateTexture(nil, "ARTWORK")
+        unIcon:SetSize(28, 28)
+        unIcon:SetPoint("TOP", cardClassEngine, "TOP", 0, -14)
+        unIcon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+        unIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+        local unTitle = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        unTitle:SetPoint("TOP", unIcon, "BOTTOM", 0, -6)
+        unTitle:SetText("No Custom Class Modules Required")
+
+        local unDesc = cardClassEngine:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        unDesc:SetPoint("TOP", unTitle, "BOTTOM", 0, -4)
+        unDesc:SetPoint("LEFT", cardClassEngine, "LEFT", 20, 0)
+        unDesc:SetPoint("RIGHT", cardClassEngine, "RIGHT", -20, 0)
+        unDesc:SetWordWrap(true)
+        unDesc:SetJustifyH("CENTER")
+        unDesc:SetText("Your class utilizes the core universal ForeverClasses HUD engine without requiring dedicated sub-bars. All core features (Resource Bars, Absorbs, Heals, and Ability Docks) are fully active.")
+    end
+
+    -- ========================================================================
+    -- PANEL 4: Alerts & Debuffs
+    -- ========================================================================
+    local panelAlerts = CreateFrame("Frame", nil, contentArea)
+    panelAlerts:SetAllPoints(contentArea)
+    panelAlerts:Hide()
+    contentPanels["alerts"] = panelAlerts
+
+    local titleAlerts = panelAlerts:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
+    titleAlerts:SetPoint("TOPLEFT", panelAlerts, "TOPLEFT", 0, -2)
+    titleAlerts:SetText("Alerts & Debuffs")
+
+    local subAlerts = panelAlerts:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    subAlerts:SetPoint("TOPLEFT", titleAlerts, "BOTTOMLEFT", 0, -2)
+    subAlerts:SetPoint("RIGHT", panelAlerts, "RIGHT", -12, 0)
+    subAlerts:SetWordWrap(true)
+    subAlerts:SetJustifyH("LEFT")
+    subAlerts:SetText("Low health warnings and harmful combat debuffs.")
+
+    -- Option 1: Low Health Danger Pulse Slider (15-50%)
+    local cardLowHp = CreateSliderCard(panelAlerts, "Low Health Danger Pulse",
+        "Triggers red perimeter alert pulse and warning audio chime.", -40,
+        15, 50, 1,
+        function() return ForeverClassesDB.lowHealthThreshold or 33 end,
+        function(val)
+            ForeverClassesDB.lowHealthThreshold = val
+            ForeverClassesDB.lowHealthWarning = true
+            if FC.SaveCharSetting then FC:SaveCharSetting("lowHealthWarning", true) end
+            if FC.UpdateHealth then FC:UpdateHealth() end
+        end,
+        function(val) return string.format("|cffff4444<= %d%% HP|r", val) end,
+        "lowHealthThreshold"
+    )
+
+    -- Option 2: Harmful Debuffs Tray Toggle
+    local cardDebuffs = CreateToggleSwitchCard(panelAlerts, "Harmful Debuffs Tray",
+        "Docked to the right of the HUD with Magic, Curse, Poison & Disease borders.", -114,
         function() return ForeverClassesDB.showDebuffs end,
         function(val)
             ForeverClassesDB.showDebuffs = val
@@ -678,110 +1636,205 @@ function FC:CreateConfigWindow()
         end,
         "showDebuffs"
     )
-    debuffCb:SetPoint("TOPLEFT", lowHealthCb, "BOTTOMLEFT", 0, -4)
 
-    local autoFadeCb = CreateCheckbox(f, "Out-of-Combat Auto Fade (Resting: 35%)",
-        function() return ForeverClassesDB.autoFade end,
-        function(val)
-            ForeverClassesDB.autoFade = val
-            if FC.RequestFadeCheck then FC:RequestFadeCheck() end
-            if not val and FC.Frame then FC.Frame:SetAlpha(1.0) end
-            if FC.ConfigWindow and FC.ConfigWindow.Refresh then FC.ConfigWindow:Refresh() end
-        end,
-        "autoFade"
-    )
-    autoFadeCb:SetPoint("TOPLEFT", debuffCb, "BOTTOMLEFT", 0, -4)
-    local origAutoFadeUpdate = autoFadeCb.UpdateValue
-    autoFadeCb.UpdateValue = function(self)
-        if origAutoFadeUpdate then origAutoFadeUpdate(self) end
-        local pct = math.floor(((ForeverClassesDB and ForeverClassesDB.autoFadeAlpha) or 0.35) * 100)
-        if self.text then
-            self.text:SetText(string.format("Out-of-Combat Auto Fade (Resting: %d%%)", pct))
+    -- ========================================================================
+    -- PANEL 5: Position & Movement
+    -- ========================================================================
+    local panelPosition = CreateFrame("Frame", nil, contentArea)
+    panelPosition:SetAllPoints(contentArea)
+    panelPosition:Hide()
+    contentPanels["position"] = panelPosition
+
+    local titlePosition = panelPosition:CreateFontString(nil, "OVERLAY", "GameFontHighlightMedium")
+    titlePosition:SetPoint("TOPLEFT", panelPosition, "TOPLEFT", 0, -2)
+    titlePosition:SetText("Position & Locking")
+
+    local subPosition = panelPosition:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    subPosition:SetPoint("TOPLEFT", titlePosition, "BOTTOMLEFT", 0, -2)
+    subPosition:SetPoint("RIGHT", panelPosition, "RIGHT", -12, 0)
+    subPosition:SetWordWrap(true)
+    subPosition:SetJustifyH("LEFT")
+    subPosition:SetText("Lock your HUD or move it anywhere across your screen.")
+
+    -- Radio Options for Movement
+    local moveCards = {}
+
+    local function CreateRadioCard(parent, titleText, descText, yOffset, modeKey)
+        local card = CreateFrame("Button", nil, parent, BackdropTemplateString)
+        card:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, yOffset)
+        card:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yOffset)
+        card:SetHeight(52)
+        ApplyWHITE8X8Backdrop(card, 0.08, 0.09, 0.12, 0.95, 0.18, 0.20, 0.26, 0.8, 1)
+
+        local radioCircle = CreateFrame("Frame", nil, card, BackdropTemplateString)
+        radioCircle:SetSize(16, 16)
+        radioCircle:SetPoint("RIGHT", card, "RIGHT", -14, 0)
+        ApplyWHITE8X8Backdrop(radioCircle, 0.05, 0.06, 0.08, 1.0, 0.28, 0.32, 0.40, 1.0, 1)
+
+        local dot = radioCircle:CreateTexture(nil, "OVERLAY")
+        dot:SetSize(8, 8)
+        dot:SetPoint("CENTER", radioCircle, "CENTER", 0, 0)
+        dot:SetTexture("Interface\\Buttons\\WHITE8X8")
+        dot:SetVertexColor(0.0, 0.80, 1.0, 1.0)
+        radioCircle.dot = dot
+
+        local title = card:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        title:SetPoint("TOPLEFT", card, "TOPLEFT", 12, -8)
+        title:SetPoint("TOPRIGHT", card, "TOPRIGHT", -40, -8)
+        title:SetJustifyH("LEFT")
+        title:SetText(titleText)
+
+        local desc = card:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+        desc:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -2)
+        desc:SetWordWrap(true)
+        desc:SetJustifyH("LEFT")
+        desc:SetText(descText)
+
+        card.UpdateValue = function(self)
+            local isSel = (ForeverClassesDB.movementMode == modeKey)
+            if isSel then
+                card:SetBackdropColor(0.10, 0.12, 0.16, 0.95)
+                card:SetBackdropBorderColor(0.0, 0.65, 0.85, 0.7)
+                radioCircle:SetBackdropBorderColor(0.0, 0.80, 1.0, 1.0)
+                dot:Show()
+            else
+                card:SetBackdropColor(0.08, 0.09, 0.12, 0.95)
+                card:SetBackdropBorderColor(0.18, 0.20, 0.26, 0.8)
+                radioCircle:SetBackdropBorderColor(0.24, 0.28, 0.36, 1.0)
+                dot:Hide()
+            end
         end
+
+        card:SetScript("OnClick", function()
+            PlaySound(SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856)
+            ForeverClassesDB.movementMode = modeKey
+            if FC.ApplyConfig then FC:ApplyConfig() end
+            f:Refresh()
+        end)
+
+        moveCards[modeKey] = card
+        return card
     end
 
-    -- Ability & Cooldown Slots Selector (0 to 7)
-    local cdTitle = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    cdTitle:SetPoint("TOPLEFT", autoFadeCb, "BOTTOMLEFT", 0, -8)
-    cdTitle:SetText("Ability & Cooldown Slots (0 - 7):")
+    CreateRadioCard(panelPosition, "Free Move", "Left-click and drag anywhere on the bar to reposition.", -40, "FREE")
 
-    local cdStatusText = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    cdStatusText:SetPoint("LEFT", cdTitle, "RIGHT", 6, 0)
+    -- Hold Modifier Key Card (with embedded ALT/SHIFT/CTRL buttons)
+    local cardMod = CreateFrame("Frame", nil, panelPosition, BackdropTemplateString)
+    cardMod:SetPoint("TOPLEFT", panelPosition, "TOPLEFT", 0, -98)
+    cardMod:SetPoint("TOPRIGHT", panelPosition, "TOPRIGHT", 0, -98)
+    cardMod:SetHeight(74)
+    ApplyWHITE8X8Backdrop(cardMod, 0.08, 0.09, 0.12, 0.95, 0.18, 0.20, 0.26, 0.8, 1)
 
-    local cdGroup = CreateFrame("Frame", nil, f)
-    cdGroup:SetSize(280, 24)
-    cdGroup:SetPoint("TOPLEFT", cdTitle, "BOTTOMLEFT", 0, -4)
+    local modRadio = CreateFrame("Button", nil, cardMod, BackdropTemplateString)
+    modRadio:SetSize(16, 16)
+    modRadio:SetPoint("TOPRIGHT", cardMod, "TOPRIGHT", -14, -12)
+    ApplyWHITE8X8Backdrop(modRadio, 0.05, 0.06, 0.08, 1.0, 0.28, 0.32, 0.40, 1.0, 1)
 
-    local cdSlotBtns = {}
-    local btnOffsets = {
-        [0] = { x = 0,   w = 44, label = "0 (Off)" },
-        [1] = { x = 48,  w = 25, label = "1" },
-        [2] = { x = 76,  w = 25, label = "2" },
-        [3] = { x = 104, w = 25, label = "3" },
-        [4] = { x = 132, w = 25, label = "4" },
-        [5] = { x = 160, w = 25, label = "5" },
-        [6] = { x = 188, w = 25, label = "6" },
-        [7] = { x = 216, w = 25, label = "7" },
-    }
+    local modDot = modRadio:CreateTexture(nil, "OVERLAY")
+    modDot:SetSize(8, 8)
+    modDot:SetPoint("CENTER", modRadio, "CENTER", 0, 0)
+    modDot:SetTexture("Interface\\Buttons\\WHITE8X8")
+    modDot:SetVertexColor(0.0, 0.80, 1.0, 1.0)
 
-    for num = 0, 7 do
-        local info = btnOffsets[num]
-        local btn = CreateFrame("Button", nil, cdGroup, "UIPanelButtonTemplate")
-        btn:SetSize(info.w, 22)
-        btn:SetPoint("LEFT", cdGroup, "LEFT", info.x, 0)
-        btn:SetText(info.label)
+    local modTitle = cardMod:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    modTitle:SetPoint("TOPLEFT", cardMod, "TOPLEFT", 12, -8)
+    modTitle:SetPoint("TOPRIGHT", cardMod, "TOPRIGHT", -40, -8)
+    modTitle:SetJustifyH("LEFT")
+    modTitle:SetText("Hold Modifier Key")
+
+    local modDesc = cardMod:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    modDesc:SetPoint("TOPLEFT", modTitle, "BOTTOMLEFT", 0, -2)
+    modDesc:SetPoint("TOPRIGHT", modTitle, "BOTTOMRIGHT", 0, -2)
+    modDesc:SetWordWrap(true)
+    modDesc:SetJustifyH("LEFT")
+    modDesc:SetText("Only drags when holding Alt, Shift, or Ctrl.")
+
+    local modClickArea = CreateFrame("Button", nil, cardMod)
+    modClickArea:SetPoint("TOPLEFT", cardMod, "TOPLEFT", 0, 0)
+    modClickArea:SetPoint("BOTTOMRIGHT", cardMod, "TOPRIGHT", 0, -32)
+    modClickArea:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856)
+        ForeverClassesDB.movementMode = "MODIFIER"
+        if FC.ApplyConfig then FC:ApplyConfig() end
+        f:Refresh()
+    end)
+
+    -- Keys: ALT / SHIFT / CTRL
+    local modKeyBtns = {}
+    local modKeys = { "ALT", "SHIFT", "CTRL" }
+    for i, k in ipairs(modKeys) do
+        local btn = CreateFrame("Button", nil, cardMod, BackdropTemplateString)
+        btn:SetSize(60, 20)
+        btn:SetPoint("TOPLEFT", cardMod, "TOPLEFT", 12 + ((i - 1) * 66), -46)
+        ApplyWHITE8X8Backdrop(btn, 0.05, 0.06, 0.08, 0.8, 0.15, 0.17, 0.22, 0.8, 1)
+
+        local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        btnText:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        btnText:SetText(k)
+        btn.btnText = btnText
+
         btn:SetScript("OnClick", function()
             PlaySound(SOUNDKIT.IG_MAINOPTION_CHECKBOX_ON or 856)
-            FC:SetCooldownSlotCount(num)
+            ForeverClassesDB.movementMode = "MODIFIER"
+            ForeverClassesDB.modifierKey = k
+            if FC.ApplyConfig then FC:ApplyConfig() end
+            f:Refresh()
         end)
-        cdSlotBtns[num] = btn
+        modKeyBtns[k] = btn
     end
 
-    local cdPulseCb = CreateCheckbox(f, "Cooldown Ready Pulse (Flash icon when ready)",
-        function() return ForeverClassesDB.cooldownPulse ~= false end,
-        function(val)
-            ForeverClassesDB.cooldownPulse = val
-            if FC.ConfigWindow and FC.ConfigWindow.Refresh then FC.ConfigWindow:Refresh() end
-        end,
-        "cooldownPulse"
-    )
-    cdPulseCb:SetPoint("TOPLEFT", cdGroup, "BOTTOMLEFT", 0, -6)
-
-    -- Section 3: Text Display Mode
-    local textTitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    textTitle:SetPoint("TOPLEFT", cdPulseCb, "BOTTOMLEFT", 0, -12)
-    textTitle:SetText("Bar Text Display Mode:")
-
-    local textModes = {
-        { id = "SYNC", label = "Sync with Game Interface Settings" },
-        { id = "BOTH", label = "Both (Values & Percentage: 1,500 | 100%)" },
-        { id = "NUMERIC", label = "Numeric Only (Current / Max)" },
-        { id = "PERCENT", label = "Percentage Only (100%)" },
-        { id = "NONE", label = "Hide Text" },
-    }
-
-    local textCheckboxes = {}
-    local lastAnchor = textTitle
-    for _, tm in ipairs(textModes) do
-        local cb = CreateCheckbox(f, tm.label,
-            function() return ForeverClassesDB.textMode == tm.id end,
-            function()
-                ForeverClassesDB.textMode = tm.id
-                if FC.SaveCharSetting then FC:SaveCharSetting("textMode", tm.id) end
-                FC.ConfigWindow:Refresh()
+    cardMod.UpdateValue = function()
+        local isSel = (ForeverClassesDB.movementMode == "MODIFIER")
+        if isSel then
+            cardMod:SetBackdropColor(0.10, 0.12, 0.16, 0.95)
+            cardMod:SetBackdropBorderColor(0.0, 0.65, 0.85, 0.7)
+            modRadio:SetBackdropBorderColor(0.0, 0.80, 1.0, 1.0)
+            modDot:Show()
+        else
+            cardMod:SetBackdropColor(0.08, 0.09, 0.12, 0.95)
+            cardMod:SetBackdropBorderColor(0.18, 0.20, 0.26, 0.8)
+            modRadio:SetBackdropBorderColor(0.24, 0.28, 0.36, 1.0)
+            modDot:Hide()
+        end
+        local curKey = ForeverClassesDB.modifierKey or "ALT"
+        for k, btn in pairs(modKeyBtns) do
+            if isSel and k == curKey then
+                btn:SetBackdropColor(0.0, 0.50, 0.70, 0.35)
+                btn:SetBackdropBorderColor(0.0, 0.80, 1.0, 0.9)
+                btn.btnText:SetTextColor(0.0, 0.80, 1.0, 1.0)
+            else
+                btn:SetBackdropColor(0.05, 0.06, 0.08, 0.8)
+                btn:SetBackdropBorderColor(0.15, 0.17, 0.22, 0.8)
+                btn.btnText:SetTextColor(0.65, 0.68, 0.75, 1.0)
             end
-        )
-        cb:SetPoint("TOPLEFT", lastAnchor, "BOTTOMLEFT", 0, -4)
-        lastAnchor = cb
-        table.insert(textCheckboxes, cb)
+        end
     end
+    moveCards["MODIFIER"] = cardMod
 
-    -- Bottom Buttons: Reset Position & Close
-    local resetBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    resetBtn:SetSize(120, 24)
-    resetBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 18, 16)
-    resetBtn:SetText("Reset Position")
+    CreateRadioCard(panelPosition, "Locked", "Completely locked in place, clicks pass through.", -178, "LOCKED")
+
+    -- Reset Position Button
+    local resetBtn = CreateFrame("Button", nil, panelPosition, BackdropTemplateString)
+    resetBtn:SetPoint("TOPLEFT", panelPosition, "TOPLEFT", 0, -236)
+    resetBtn:SetPoint("TOPRIGHT", panelPosition, "TOPRIGHT", 0, -236)
+    resetBtn:SetHeight(32)
+    ApplyWHITE8X8Backdrop(resetBtn, 0.25, 0.08, 0.08, 0.6, 0.65, 0.18, 0.18, 0.7, 1)
+
+    local resetText = resetBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    resetText:SetPoint("CENTER", resetBtn, "CENTER", 0, 0)
+    resetText:SetText("|cffff6666Reset Frame to Screen Center (X: 0, Y: -140)|r")
+
+    resetBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.35, 0.10, 0.10, 0.8)
+        self:SetBackdropBorderColor(0.85, 0.25, 0.25, 0.9)
+    end)
+    resetBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.25, 0.08, 0.08, 0.6)
+        self:SetBackdropBorderColor(0.65, 0.18, 0.18, 0.7)
+    end)
     resetBtn:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINOPTION_OK or 856)
         ForeverClassesDB.point = FC.Defaults.point
         ForeverClassesDB.relativePoint = FC.Defaults.relativePoint
         ForeverClassesDB.x = FC.Defaults.x
@@ -790,87 +1843,85 @@ function FC:CreateConfigWindow()
         print("|cff00ccff[ForeverClasses]|r Position reset to center.")
     end)
 
-    local doneBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    doneBtn:SetSize(90, 24)
-    doneBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -18, 16)
-    doneBtn:SetText("Done")
-    doneBtn:SetScript("OnClick", function() f:Hide() end)
+    -- ========================================================================
+    -- Window Footer Action Bar
+    -- ========================================================================
+    local footer = CreateFrame("Frame", nil, f)
+    footer:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
+    footer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+    footer:SetHeight(30)
 
+    local footerNote = footer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    footerNote:SetPoint("LEFT", footer, "LEFT", 0, 0)
+    footerNote:SetText("Slash Commands: |cff00ccff/fc|r • Version 1.0.3")
+
+    -- Discard Button
+    local discardBtn = CreateFrame("Button", nil, footer, BackdropTemplateString)
+    discardBtn:SetSize(80, 24)
+    discardBtn:SetPoint("RIGHT", footer, "RIGHT", -124, 0)
+    ApplyWHITE8X8Backdrop(discardBtn, 0.14, 0.16, 0.20, 0.9, 0.25, 0.28, 0.35, 0.8, 1)
+
+    local discardText = discardBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    discardText:SetPoint("CENTER", discardBtn, "CENTER", 0, 0)
+    discardText:SetText("Discard")
+
+    discardBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.20, 0.22, 0.28, 1.0)
+    end)
+    discardBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.14, 0.16, 0.20, 0.9)
+    end)
+    discardBtn:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINOPTION_CLOSE or 857)
+        f:Hide()
+    end)
+
+    -- Save & Apply Button
+    local saveBtn = CreateFrame("Button", nil, footer, BackdropTemplateString)
+    saveBtn:SetSize(114, 24)
+    saveBtn:SetPoint("RIGHT", footer, "RIGHT", 0, 0)
+    ApplyWHITE8X8Backdrop(saveBtn, 0.10, 0.55, 0.32, 1.0, 0.15, 0.75, 0.45, 1.0, 1)
+
+    local saveText = saveBtn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    saveText:SetPoint("CENTER", saveBtn, "CENTER", 0, 0)
+    saveText:SetText("Save & Apply")
+
+    saveBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.14, 0.65, 0.38, 1.0)
+    end)
+    saveBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.10, 0.55, 0.32, 1.0)
+    end)
+    saveBtn:SetScript("OnClick", function()
+        PlaySound(SOUNDKIT.IG_MAINOPTION_OK or 856)
+        if FC.SyncActiveCharSettings then pcall(FC.SyncActiveCharSettings, FC) end
+        if FC.ApplyConfig then FC:ApplyConfig() end
+        f:Hide()
+        print("|cff00ccff[ForeverClasses]|r Settings saved & applied.")
+    end)
+
+    -- Master Refresh Method
     f.Refresh = function()
-        moveFree:UpdateValue()
-        moveMod:UpdateValue()
-        moveLock:UpdateValue()
-        classColorCb:UpdateValue()
-        healCb:UpdateValue()
-        absorbCb:UpdateValue()
+        UpdateHUDPreview()
 
-        local _, playerClass = UnitClass("player")
-        local isClassCombo = (playerClass == "ROGUE" or playerClass == "DRUID")
-        local isClassShaman = (playerClass == "SHAMAN")
+        if cardClassColor and cardClassColor.sw then cardClassColor.sw:UpdateValue() end
+        if cardHeals and cardHeals.sw then cardHeals.sw:UpdateValue() end
+        if cardTextMode then cardTextMode:UpdateValue() end
+        if cardFade then cardFade:UpdateValue() end
 
-        if isClassCombo then
-            totemCb:Hide()
-            cpCb:ClearAllPoints()
-            cpCb:SetPoint("TOPLEFT", absorbCb, "BOTTOMLEFT", 0, -4)
-            cpCb:Show()
-            cpCb:UpdateValue()
+        if cardSlots then cardSlots:UpdateValue() end
+        if cardPulse and cardPulse.sw then cardPulse.sw:UpdateValue() end
 
-            lowHealthCb:ClearAllPoints()
-            lowHealthCb:SetPoint("TOPLEFT", cpCb, "BOTTOMLEFT", 0, -4)
-        elseif isClassShaman then
-            cpCb:Hide()
-            totemCb:ClearAllPoints()
-            totemCb:SetPoint("TOPLEFT", absorbCb, "BOTTOMLEFT", 0, -4)
-            totemCb:Show()
-            totemCb:UpdateValue()
+        if cardClassEngine and cardClassEngine.sw then cardClassEngine.sw:UpdateValue() end
 
-            lowHealthCb:ClearAllPoints()
-            lowHealthCb:SetPoint("TOPLEFT", totemCb, "BOTTOMLEFT", 0, -4)
-        else
-            cpCb:Hide()
-            totemCb:Hide()
-            lowHealthCb:ClearAllPoints()
-            lowHealthCb:SetPoint("TOPLEFT", absorbCb, "BOTTOMLEFT", 0, -4)
+        if cardLowHp then cardLowHp:UpdateValue() end
+        if cardDebuffs and cardDebuffs.sw then cardDebuffs.sw:UpdateValue() end
+
+        for _, card in pairs(moveCards) do
+            if card.UpdateValue then card:UpdateValue() end
         end
 
-        lowHealthCb:UpdateValue()
-        debuffCb:UpdateValue()
-        autoFadeCb:UpdateValue()
-        cdPulseCb:UpdateValue()
-
-        local curSlots = ForeverClassesDB.cooldownSlotCount
-        if curSlots == nil then
-            curSlots = (ForeverClassesDB.showCooldowns == false) and 0 or 7
-        end
-        for num, btn in pairs(cdSlotBtns) do
-            if num == curSlots then
-                btn:LockHighlight()
-            else
-                btn:UnlockHighlight()
-            end
-        end
-        if curSlots == 0 then
-            cdStatusText:SetText("|cffff4444(Disabled)|r")
-        else
-            cdStatusText:SetText(string.format("|cff00ff00(%d Active)|r", curSlots))
-        end
-
-        for _, cb in ipairs(textCheckboxes) do
-            cb:UpdateValue()
-        end
-
-        for k, btn in pairs(keyBtns) do
-            if ForeverClassesDB.movementMode == "MODIFIER" and ForeverClassesDB.modifierKey == k then
-                btn:LockHighlight()
-            else
-                btn:UnlockHighlight()
-            end
-            if ForeverClassesDB.movementMode == "MODIFIER" then
-                btn:Enable()
-            else
-                btn:Disable()
-            end
-        end
+        SelectTab(currentTab)
     end
 
     f:SetScript("OnShow", f.Refresh)
@@ -878,8 +1929,8 @@ function FC:CreateConfigWindow()
         if FC.SyncActiveCharSettings then pcall(FC.SyncActiveCharSettings, FC) end
         if FC.RequestFadeCheck then FC:RequestFadeCheck() end
     end)
-    f:Hide()
 
+    f:Hide()
     FC.ConfigWindow = f
     return f
 end
