@@ -1129,6 +1129,7 @@ function FC:CreateHUD()
     -- Drag & Move Handlers
     frame:SetScript("OnMouseDown", function(self, button)
         if button ~= "LeftButton" then return end
+        if InCombatLockdown and InCombatLockdown() then return end
         local mode = ForeverClassesDB.movementMode
 
         if mode == "LOCKED" then
@@ -1156,8 +1157,10 @@ function FC:CreateHUD()
             ForeverClassesDB.relativePoint = relPoint or "CENTER"
             ForeverClassesDB.x = math.floor(x + 0.5)
             ForeverClassesDB.y = math.floor(y + 0.5)
-            if FC.AttachEssentialCooldowns then
-                pcall(FC.AttachEssentialCooldowns, FC)
+            if not (InCombatLockdown and InCombatLockdown()) then
+                if FC.AttachEssentialCooldowns then
+                    pcall(FC.AttachEssentialCooldowns, FC)
+                end
             end
         end
     end)
@@ -1545,6 +1548,7 @@ function FC:CreateHUD()
         slot:RegisterForClicks("RightButtonUp", "LeftButtonUp")
         slot:RegisterForDrag("LeftButton")
         slot:SetScript("OnDragStart", function()
+            if InCombatLockdown and InCombatLockdown() then return end
             if frame.StartMoving and (not ForeverClassesDB.movementMode or ForeverClassesDB.movementMode == "FREE" or IsAltKeyDown()) then
                 frame:StartMoving()
                 frame.isMoving = true
@@ -1554,7 +1558,16 @@ function FC:CreateHUD()
             if frame.StopMovingOrSizing and frame.isMoving then
                 frame:StopMovingOrSizing()
                 frame.isMoving = false
-                if FC.SavePosition then FC:SavePosition() end
+                local point, _, relPoint, x, y = frame:GetPoint()
+                ForeverClassesDB.point = point or "CENTER"
+                ForeverClassesDB.relativePoint = relPoint or "CENTER"
+                ForeverClassesDB.x = math.floor(x + 0.5)
+                ForeverClassesDB.y = math.floor(y + 0.5)
+                if not (InCombatLockdown and InCombatLockdown()) then
+                    if FC.AttachEssentialCooldowns then
+                        pcall(FC.AttachEssentialCooldowns, FC)
+                    end
+                end
             end
         end)
 
@@ -7552,14 +7565,20 @@ end
 function FC:UpdatePoisonTracker()
     if not FC.PoisonBar then return end
 
+    local inLockdown = (InCombatLockdown and InCombatLockdown())
+
     local _, classToken = UnitClass("player")
     if classToken ~= "ROGUE" then
-        FC.PoisonBar:Hide()
+        if not inLockdown and FC.PoisonBar:IsShown() then
+            FC.PoisonBar:Hide()
+        end
         return
     end
 
     if ForeverClassesDB and ForeverClassesDB.showPoisonTracker == false then
-        FC.PoisonBar:Hide()
+        if not inLockdown and FC.PoisonBar:IsShown() then
+            FC.PoisonBar:Hide()
+        end
         return
     end
 
@@ -7572,13 +7591,19 @@ function FC:UpdatePoisonTracker()
         local ohActive = FC.PoisonOH and FC.PoisonOH.state == "ACTIVE"
         if mhActive and ohActive then
             if FC.PoisonBar:IsShown() and not (FC.PoisonFlyout and FC.PoisonFlyout:IsShown()) then
-                FC.PoisonBar:Hide()
+                if not inLockdown then
+                    FC.PoisonBar:Hide()
+                end
             end
             return
         end
     end
 
-    FC.PoisonBar:Show()
+    if not FC.PoisonBar:IsShown() then
+        if not inLockdown then
+            FC.PoisonBar:Show()
+        end
+    end
 end
 
 -- ============================================================================
@@ -7724,6 +7749,7 @@ end
 function FC:HidePoisonFlyout()
     if FC.PoisonFlyout and FC.PoisonFlyout:IsShown() then
         FC.PoisonFlyout:Hide()
+        FC.PoisonFlyout:ClearAllPoints()
     end
 end
 
@@ -7804,14 +7830,16 @@ function FC:TogglePoisonFlyout(anchorFrame, targetSlotID)
     menu.title:SetText(handName)
 
     menu:ClearAllPoints()
-    local frameTop = anchorFrame:GetTop() or 0
+    local left = anchorFrame:GetLeft() or 0
+    local bottom = anchorFrame:GetBottom() or 0
+    local top = anchorFrame:GetTop() or 0
     local screenHeight = GetScreenHeight and GetScreenHeight() or 768
-    local openDownwards = (frameTop > (screenHeight - 180))
+    local openDownwards = (top > (screenHeight - 180))
 
     if openDownwards then
-        menu:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, -4)
+        menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, bottom - 4)
     else
-        menu:SetPoint("BOTTOMLEFT", anchorFrame, "TOPLEFT", 0, 4)
+        menu:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, top + 4)
     end
 
     FC:PopulatePoisonFlyoutItems()
@@ -8477,6 +8505,10 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
     elseif event == "PLAYER_REGEN_DISABLED" then
         if FC.HideFlyout then FC:HideFlyout() end
         if FC.HidePoisonFlyout then FC:HidePoisonFlyout() end
+        if FC.Frame and FC.Frame.isMoving then
+            FC.Frame:StopMovingOrSizing()
+            FC.Frame.isMoving = false
+        end
         FC.inCombat = true
         FC.previousComboPoints = 0
         FC.needsCooldownRefresh = true
