@@ -572,10 +572,6 @@ function FC:CreateConfigWindow()
     previewSandbox:SetHeight(138)
     ApplyWHITE8X8Backdrop(previewSandbox, 0.032, 0.036, 0.048, 0.95, 0.12, 0.14, 0.18, 1.0, 1)
 
-    local previewBadge = previewSandbox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    previewBadge:SetPoint("TOPLEFT", previewSandbox, "TOPLEFT", 10, -8)
-    previewBadge:SetText("|cff666666LIVE HUD PREVIEW|r")
-
     -- Main HUD Cluster Center Anchor
     local hudCluster = CreateFrame("Frame", nil, previewSandbox)
     hudCluster:SetSize(240, 84)
@@ -598,25 +594,14 @@ function FC:CreateConfigWindow()
         slotNum:SetText(tostring(i))
         slotNum:SetTextColor(0.6, 0.65, 0.75, 1)
 
-        -- Slot 3 has amber border & ready pip for visual demonstration
-        if i == 3 then
-            slot:SetBackdropBorderColor(0.85, 0.65, 0.20, 0.9)
-            slotNum:SetTextColor(1.0, 0.85, 0.3, 1)
-            local dot = slot:CreateTexture(nil, "OVERLAY")
-            dot:SetSize(4, 4)
-            dot:SetPoint("TOPRIGHT", slot, "TOPRIGHT", -2, -2)
-            dot:SetTexture("Interface\\Buttons\\WHITE8X8")
-            dot:SetVertexColor(1.0, 0.85, 0.3, 1)
-        end
-
         previewSlotBtns[i] = slot
     end
 
-    -- 2. Health Bar Container (with Overshield Cyan Glow Border)
+    -- 2. Health Bar Container
     local previewHealthContainer = CreateFrame("Frame", nil, hudCluster, BackdropTemplateString)
     previewHealthContainer:SetSize(240, 22)
     previewHealthContainer:SetPoint("TOPLEFT", hudCluster, "TOPLEFT", 0, -24)
-    ApplyWHITE8X8Backdrop(previewHealthContainer, 0.02, 0.02, 0.02, 0.9, 0.0, 0.80, 1.0, 0.7, 1)
+    ApplyWHITE8X8Backdrop(previewHealthContainer, 0.02, 0.02, 0.02, 0.9, 0.18, 0.20, 0.26, 0.8, 1)
 
     -- Health Fill
     local previewHealthFill = previewHealthContainer:CreateTexture(nil, "BORDER")
@@ -633,14 +618,6 @@ function FC:CreateConfigWindow()
     previewHealFill:SetPoint("BOTTOMLEFT", previewHealthFill, "BOTTOMRIGHT", 0, 0)
     previewHealFill:SetWidth(238 * 0.14)
     previewHealFill:SetVertexColor(0.30, 0.85, 0.55, 0.45)
-
-    -- Damage Absorption Shield Fill (Native Core Feature)
-    local previewAbsorbFill = previewHealthContainer:CreateTexture(nil, "OVERLAY")
-    previewAbsorbFill:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
-    previewAbsorbFill:SetPoint("TOPLEFT", previewHealFill, "TOPRIGHT", 0, 0)
-    previewAbsorbFill:SetPoint("BOTTOMLEFT", previewHealFill, "BOTTOMRIGHT", 0, 0)
-    previewAbsorbFill:SetWidth(238 * 0.08)
-    previewAbsorbFill:SetVertexColor(0.0, 0.80, 1.0, 0.45)
 
     -- Health Text
     local previewHealthText = previewHealthContainer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -792,24 +769,15 @@ function FC:CreateConfigWindow()
             previewHealFill:SetVertexColor(0.30, 0.85, 0.55, 0.45)
         end
 
-        -- 3. Upcoming Heals & Absorb Positioning
+        -- 3. Upcoming Heals Positioning
         if showHeals then
             previewHealFill:Show()
             previewHealFill:ClearAllPoints()
             previewHealFill:SetPoint("TOPLEFT", previewHealthFill, "TOPRIGHT", 0, 0)
             previewHealFill:SetPoint("BOTTOMLEFT", previewHealthFill, "BOTTOMRIGHT", 0, 0)
             previewHealFill:SetWidth(238 * 0.14)
-
-            previewAbsorbFill:ClearAllPoints()
-            previewAbsorbFill:SetPoint("TOPLEFT", previewHealFill, "TOPRIGHT", 0, 0)
-            previewAbsorbFill:SetPoint("BOTTOMLEFT", previewHealFill, "BOTTOMRIGHT", 0, 0)
-            previewAbsorbFill:SetWidth(238 * 0.08)
         else
             previewHealFill:Hide()
-            previewAbsorbFill:ClearAllPoints()
-            previewAbsorbFill:SetPoint("TOPLEFT", previewHealthFill, "TOPRIGHT", 0, 0)
-            previewAbsorbFill:SetPoint("BOTTOMLEFT", previewHealthFill, "BOTTOMRIGHT", 0, 0)
-            previewAbsorbFill:SetWidth(238 * 0.16)
         end
 
         -- 4. Status Text: Health Bar
