@@ -784,13 +784,38 @@ function FC:CreateConfigWindow()
                     slot:SetPoint("LEFT", previewSlotsDock, "LEFT", (i - 1) * (size + gap), 0)
                     slot:Show()
 
-                    local spellID = charData and charData.cooldownSlots and charData.cooldownSlots[i]
+                    local slotData = charData and charData.cooldownSlots and charData.cooldownSlots[i]
                     local spellTex = nil
-                    if spellID and not (InCombatLockdown and InCombatLockdown()) then
-                        if C_Spell and C_Spell.GetSpellTexture then
-                            spellTex = C_Spell.GetSpellTexture(spellID)
-                        elseif GetSpellTexture then
-                            spellTex = GetSpellTexture(spellID)
+                    if slotData then
+                        if type(slotData) == "table" then
+                            spellTex = slotData.icon
+                            if not spellTex and slotData.id and not (InCombatLockdown and InCombatLockdown()) then
+                                pcall(function()
+                                    if slotData.type == "item" then
+                                        if C_Item and C_Item.GetItemIconByID then
+                                            spellTex = C_Item.GetItemIconByID(slotData.id)
+                                        elseif GetItemIcon then
+                                            spellTex = GetItemIcon(slotData.id)
+                                        end
+                                    else
+                                        if C_Spell and C_Spell.GetSpellTexture then
+                                            spellTex = C_Spell.GetSpellTexture(slotData.id)
+                                        elseif GetSpellTexture then
+                                            spellTex = GetSpellTexture(slotData.id)
+                                        end
+                                    end
+                                end)
+                            end
+                        elseif type(slotData) == "number" or type(slotData) == "string" then
+                            if not (InCombatLockdown and InCombatLockdown()) then
+                                pcall(function()
+                                    if C_Spell and C_Spell.GetSpellTexture then
+                                        spellTex = C_Spell.GetSpellTexture(slotData)
+                                    elseif GetSpellTexture then
+                                        spellTex = GetSpellTexture(slotData)
+                                    end
+                                end)
+                            end
                         end
                     end
 
