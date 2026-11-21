@@ -7621,7 +7621,10 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4, ..
         if FC.AttachEssentialCooldowns then
             pcall(FC.AttachEssentialCooldowns, FC)
         end
-        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff[ForeverClasses (Beta-Test)]|r v1.0.2 Loaded. Type |cff00ff00/fc|r or click the Minimap icon for settings.")
+        local ver = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("ForeverClasses", "Version"))
+            or (GetAddOnMetadata and GetAddOnMetadata("ForeverClasses", "Version"))
+            or "1.0.3"
+        DEFAULT_CHAT_FRAME:AddMessage(string.format("|cff00ccff[ForeverClasses (Beta-Test)]|r v%s Loaded. Type |cff00ff00/fc|r or click the Minimap icon for settings.", ver))
     elseif event == "PLAYER_ENTERING_WORLD" then
         FC.playerCharKey = nil
         FC.playerGUID = UnitGUID and UnitGUID("player")
